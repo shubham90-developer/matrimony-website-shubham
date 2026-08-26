@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable react-hooks/static-components */
 "use client";
 
 import ThemeBtnOne from "@/app/components/ThemeBtnOne";
@@ -19,8 +17,17 @@ import { useGetHeightsQuery } from "@/Redux/heightApi";
 import { useGetQualificationsQuery } from "@/Redux/qualificationApi";
 import { useGetOccupationsQuery } from "@/Redux/occupationApi";
 import { useGetAnnualIncomesQuery } from "@/Redux/annualIncomeApi";
+import { useGetReligionsQuery } from "@/Redux/religionApi";
+import { useGetCastesByReligionQuery } from "@/Redux/casteApi";
+import { useGetSubCastesByCasteQuery } from "@/Redux/subCasteApi";
+import { useGetMotherTonguesQuery } from "@/Redux/motherToungeApi";
+import {
+  useAddProfileMutation,
+  useUploadProfilePhotosMutation,
+  ProfilePayload,
+} from "@/Redux/profileApi";
 
-type Gender = "male" | "female" | "other";
+type Gender = "male" | "female";
 type ProfileFor = "self" | "someone-else";
 type MaritalStatus = "never-married" | "married" | "divorced" | "widowed";
 
@@ -63,6 +70,31 @@ const Register = () => {
     new Set(qualifications.map((q) => q.educationType).filter(Boolean)),
   );
 
+  const [religionId, setReligionId] = useState("");
+  const [casteId, setCasteId] = useState("");
+
+  const { data: religionsRes } = useGetReligionsQuery();
+  const { data: castesRes } = useGetCastesByReligionQuery(religionId, {
+    skip: !religionId,
+  });
+  const { data: subCastesRes } = useGetSubCastesByCasteQuery(casteId, {
+    skip: !casteId,
+  });
+  const { data: motherTonguesRes } = useGetMotherTonguesQuery();
+
+  const religions = religionsRes?.data ?? [];
+  const castes = castesRes?.data ?? [];
+  const subCastes = subCastesRes?.data ?? [];
+  const motherTongues = motherTonguesRes?.data ?? [];
+
+  // ---------- Profile creation mutation ----------
+  const [addProfile, { isLoading: isCreatingProfile }] =
+    useAddProfileMutation();
+  const [uploadProfilePhotos, { isLoading: isUploadingPhotos }] =
+    useUploadProfilePhotosMutation();
+  const isSubmitting = isCreatingProfile || isUploadingPhotos;
+  const [submitError, setSubmitError] = useState("");
+
   const [stepIndex, setStepIndex] = useState(0);
   const step = STEPS[stepIndex];
 
@@ -99,6 +131,15 @@ const Register = () => {
   const [sisters, setSisters] = useState("");
   const [marriedSisters, setMarriedSisters] = useState("");
 
+  // NEW: was missing state entirely — the "family" step's Yes/No question
+  // was previously (incorrectly) reusing familyStatus, which is also used
+  // by the unrelated "additional" step's socio-economic Family Status field.
+  // Split out so both fields save correctly.
+  const [livingWithFamily, setLivingWithFamily] = useState("");
+  // NEW: was missing state — the "Where is your family located?" input had
+  // no value/onChange at all before.
+  const [familyBasedOutOf, setFamilyBasedOutOf] = useState("");
+
   const [eatingHabit, setEatingHabit] = useState("");
   const [smokingHabit, setSmokingHabit] = useState("");
   const [drinkingHabit, setDrinkingHabit] = useState("");
@@ -107,6 +148,13 @@ const Register = () => {
   const [timeCorrection, setTimeCorrection] = useState("");
   const [nakshatra, setNakshatra] = useState("");
   const [rashi, setRashi] = useState("");
+
+  // NEW: was missing state — the horoscope step's Date of Birth input and
+  // Hour/Minute/AM-PM selects had no value/onChange at all before.
+  const [horoscopeDob, setHoroscopeDob] = useState("");
+  const [birthHour, setBirthHour] = useState("");
+  const [birthMinute, setBirthMinute] = useState("");
+  const [birthMeridiem, setBirthMeridiem] = useState("AM");
 
   const [about, setAbout] = useState("");
 
@@ -170,26 +218,6 @@ const Register = () => {
   const openFilePicker = () => fileInputRef.current?.click();
 
   const remainingSlots = MAX_PHOTOS - images.length;
-  const handlePrimaryAction = () => {
-    if (!canContinue[step]) return;
-    if (isLastStep) {
-      // submit handler goes here
-      console.log({
-        profileFor,
-        gender,
-        firstName,
-        lastName,
-        birthCountry,
-        birthCity,
-        maritalStatus,
-        qualification,
-        institution,
-        fieldOfStudy,
-      });
-      return;
-    }
-    goNext();
-  };
 
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
@@ -218,11 +246,26 @@ const Register = () => {
   const [height, setHeight] = useState("5 ft 7 in (170cm)");
   const [exactHeight, setExactHeight] = useState("");
 
+  // NEW: age was hardcoded as "25 years old" regardless of the selected
+  // birth date. Now computed from birthDay/birthMonth/birthYear.
+  const computedAge = React.useMemo(() => {
+    const monthIndex = months.indexOf(birthMonth);
+    if (monthIndex === -1) return 0;
+    const dob = new Date(Number(birthYear), monthIndex, Number(birthDay));
+    let age = currentYear - dob.getFullYear();
+    const hasHadBirthdayThisYear =
+      new Date().getMonth() > monthIndex ||
+      (new Date().getMonth() === monthIndex &&
+        new Date().getDate() >= Number(birthDay));
+    if (!hasHadBirthdayThisYear) age -= 1;
+    return Math.max(age, 0);
+  }, [birthDay, birthMonth, birthYear, currentYear]);
+
   const maritalOptions = [
-    "Never married",
-    "Widow",
-    "Awaiting divorce",
-    "Divorcee",
+    "Never Married",
+    "Divorced",
+    "Widowed",
+    "Awaiting Divorce",
   ];
 
   const OptionGroup = ({
@@ -268,16 +311,176 @@ const Register = () => {
 
     education: qualification.trim().length > 0,
 
-    religion: true, // replace with your validation
-    location: true, // replace with your validation
-    additional: true, // replace with your validation
-    family: true, // replace with your validation
-    horoscope: true, // replace with your validation
-    birth: true, // replace with your validation
-    habbits: true, // replace with your validation
-    About: true, // replace with your validation
-    profileimages: true, // replace with your validation
+    religion: true,
+    location: true,
+    additional: true,
+    family: true,
+    horoscope: true,
+    birth: true,
+    habbits: true,
+    About: true,
+    profileimages: true,
   };
+
+  // ---------- Build the ProfilePayload from all step state ----------
+  const buildProfilePayload = (): ProfilePayload => ({
+    basicDetails: {
+      profileFor: profileFor ?? "",
+      gender: gender === "male" ? "Male" : gender === "female" ? "Female" : "",
+      firstName,
+      lastName,
+      dob: `${birthYear}-${String(months.indexOf(birthMonth) + 1).padStart(2, "0")}-${String(birthDay).padStart(2, "0")}`,
+      age: computedAge,
+      height,
+      maritalStatus: maritalStatus ?? "",
+    },
+    educationDetails: {
+      highestQualification: qualification,
+      educationType,
+      occupation,
+      annualIncome,
+    },
+    religionDetails: {
+      religion,
+      caste,
+      subCaste,
+      hasDosh: dosh === "Yes",
+      motherTongue,
+    },
+    locationDetails: {
+      country,
+      state,
+      city,
+    },
+    additionalDetails: {
+      classType: familyStatus,
+      brothers,
+      marriedBrothers,
+      sisters,
+      marriedSisters,
+      livingWithFamily: livingWithFamily === "Yes",
+      familyLocation: familyBasedOutOf,
+    },
+    horoscopeDetails: {
+      birthTime: {
+        hour: Number(birthHour) || 0,
+        minute: Number(birthMinute) || 0,
+        meridiem: birthMeridiem,
+      },
+      birthPlace: {
+        country: birthCountry,
+        state: birthState,
+        city: birthCity,
+      },
+      starDetails: {
+        nakshatra,
+        rashi,
+      },
+    },
+    lifestyleDetails: {
+      eatingHabit,
+    },
+    aboutMe: {
+      about,
+      // Not collected by any step in this form yet — defaulted.
+      describeYourself: "",
+      profileCreatedBy: profileFor === "self" ? "Self" : "Family",
+      languagesISpeak: motherTongue ? [motherTongue] : [],
+      disability: "",
+      thalassemia: "",
+      hivStatus: false,
+    },
+    careerDetails: {
+      // Not collected by a dedicated field yet — occupation doubles here.
+      employedIn: "",
+      occupation,
+      organizationName: "",
+      interestedInSettlingAbroad: false,
+    },
+    education: {
+      aboutEducation: "",
+      highestDegree: qualification,
+      postGraduation: "",
+      underGraduation: "",
+      school: institution,
+    },
+    family: {
+      aboutFamily: "",
+      fatherOccupation: "",
+      motherOccupation: "",
+      brothers,
+      sisters,
+      familyIncome: "",
+      familyStatus,
+      familyType: "",
+      familyValue: "",
+      livingWithParents: livingWithFamily === "Yes",
+      familyBasedOutOf,
+    },
+    contactDetails: {
+      // Not collected by this form — typically comes from the OTP-verified
+      // mobile/account, not a form field. Defaulted here.
+      email: "",
+      alternateEmail: "",
+      phoneNumber: "",
+      alternatePhoneNumber: "",
+      landlineNumber: "",
+      relationshipWithBrideOrGroom: "",
+    },
+    lifestyle: {
+      dietaryHabit: eatingHabit,
+      drinkingHabit,
+      smokingHabit,
+      openToPets: false,
+      ownHouse: false,
+      ownCar: false,
+      foodICook: "",
+      hobbies: [],
+      favouriteMusic: [],
+      favouriteBooks: [],
+      dressStyle: "",
+      sports: [],
+      cuisine: [],
+      movies: [],
+      favouriteRead: [],
+      tvShow: [],
+    },
+  });
+
+  const handlePrimaryAction = async () => {
+    if (!canContinue[step]) return;
+
+    if (isLastStep) {
+      setSubmitError("");
+      try {
+        // STEP 1 — create the profile (plain JSON, no photos).
+        const payload = buildProfilePayload();
+        await addProfile(payload).unwrap();
+
+        // STEP 2 — if any photos were added, upload them for the profile
+        // just created. A failure here doesn't roll back step 1 — the
+        // profile still exists — so it gets its own error message.
+        if (images.length > 0) {
+          try {
+            await uploadProfilePhotos(images.map((img) => img.file)).unwrap();
+          } catch (photoErr) {
+            setSubmitError(
+              "Your profile was created, but photo upload failed. You can add photos later from your profile.",
+            );
+            return;
+          }
+        }
+
+        // Success — e.g. redirect to the newly created profile / dashboard.
+        // router.push("/my-profile") if using next/navigation's useRouter.
+      } catch (err) {
+        setSubmitError("Failed to create your profile. Please try again.");
+      }
+      return;
+    }
+    goNext();
+  };
+
   return (
     <div className="w-full min-h-screen bg-[#FDF8F3] py-12 px-5 sm:px-8 lg:px-8 flex justify-center items-start">
       <div className="mx-auto w-full max-w-3xl rounded-3xl bg-white p-8 py-10 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)]">
@@ -371,11 +574,6 @@ const Register = () => {
                     key: "female",
                     label: "Female",
                     icon: Venus,
-                  },
-                  {
-                    key: "other",
-                    label: "Other",
-                    icon: Users,
                   },
                 ] as {
                   key: Gender;
@@ -533,7 +731,8 @@ const Register = () => {
             {/* Age */}
             <div className="mt-5 rounded-full bg-linear-to-r from-rose-100 to-slate-100 px-4 py-3">
               <p className="text-sm text-slate-700">
-                You are <span className="font-semibold">25 years old</span>
+                You are{" "}
+                <span className="font-semibold">{computedAge} years old</span>
               </p>
             </div>
 
@@ -710,21 +909,26 @@ const Register = () => {
                 </label>
 
                 <select
-                  value={religion}
-                  onChange={(e) => setReligion(e.target.value)}
+                  value={religionId}
+                  onChange={(e) => {
+                    const selected = religions.find(
+                      (r) => r._id === e.target.value,
+                    );
+                    setReligionId(e.target.value);
+                    setReligion(selected?.religion ?? "");
+                    // Reset dependent selections since they belong to the old religion
+                    setCasteId("");
+                    setCaste("");
+                    setSubCaste("");
+                  }}
                   className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
                 >
                   <option value="">Select Religion</option>
 
-                  {[
-                    "Hindu",
-                    "Muslim",
-                    "Christian",
-                    "Sikh",
-                    "Jain",
-                    "Buddhist",
-                  ].map((item) => (
-                    <option key={item}>{item}</option>
+                  {religions.map((r) => (
+                    <option key={r._id} value={r._id}>
+                      {r.religion}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -736,17 +940,28 @@ const Register = () => {
                 </label>
 
                 <select
-                  value={caste}
-                  onChange={(e) => setCaste(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
+                  value={casteId}
+                  onChange={(e) => {
+                    const selected = castes.find(
+                      (c) => c._id === e.target.value,
+                    );
+                    setCasteId(e.target.value);
+                    setCaste(selected?.caste ?? "");
+                    // Reset sub-caste since it belongs to the old caste
+                    setSubCaste("");
+                  }}
+                  disabled={!religionId}
+                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
                 >
-                  <option value="">Select Caste</option>
+                  <option value="">
+                    {religionId ? "Select Caste" : "Select religion first"}
+                  </option>
 
-                  {["Maratha", "Brahmin", "Rajput", "Yadav", "Muslim"].map(
-                    (item) => (
-                      <option key={item}>{item}</option>
-                    ),
-                  )}
+                  {castes.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.caste}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -759,11 +974,18 @@ const Register = () => {
                 <select
                   value={subCaste}
                   onChange={(e) => setSubCaste(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
+                  disabled={!casteId}
+                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
                 >
-                  <option value="">Select Sub Caste</option>
+                  <option value="">
+                    {casteId ? "Select Sub Caste" : "Select caste first"}
+                  </option>
 
-                  <option value="Sample">Sample</option>
+                  {subCastes.map((s) => (
+                    <option key={s._id} value={s.subCaste}>
+                      {s.subCaste}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -805,19 +1027,10 @@ const Register = () => {
                 >
                   <option value="">Select Mother Tongue</option>
 
-                  {[
-                    "Hindi",
-                    "Marathi",
-                    "Gujarati",
-                    "Punjabi",
-                    "Tamil",
-                    "Telugu",
-                    "Kannada",
-                    "Malayalam",
-                    "Bengali",
-                    "English",
-                  ].map((item) => (
-                    <option key={item}>{item}</option>
+                  {motherTongues.map((m) => (
+                    <option key={m._id} value={m.motherTongue}>
+                      {m.motherTongue}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1002,8 +1215,8 @@ const Register = () => {
               <OptionGroup
                 title="Are you currently living with your family?"
                 options={["Yes", "No"]}
-                value={familyStatus}
-                onChange={setFamilyStatus}
+                value={livingWithFamily}
+                onChange={setLivingWithFamily}
               />
             </div>
 
@@ -1015,6 +1228,8 @@ const Register = () => {
 
               <input
                 type="text"
+                value={familyBasedOutOf}
+                onChange={(e) => setFamilyBasedOutOf(e.target.value)}
                 placeholder=" Where is your family located?"
                 className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
               />
@@ -1040,6 +1255,8 @@ const Register = () => {
 
               <input
                 type="date"
+                value={horoscopeDob}
+                onChange={(e) => setHoroscopeDob(e.target.value)}
                 className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
               />
             </div>
@@ -1057,7 +1274,11 @@ const Register = () => {
                     Hour
                   </label>
 
-                  <select className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400">
+                  <select
+                    value={birthHour}
+                    onChange={(e) => setBirthHour(e.target.value)}
+                    className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400"
+                  >
                     <option value="">HH</option>
 
                     {["01", "02", "03", "04", "05", "06", "07", "08"].map(
@@ -1076,7 +1297,11 @@ const Register = () => {
                     Minute
                   </label>
 
-                  <select className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400">
+                  <select
+                    value={birthMinute}
+                    onChange={(e) => setBirthMinute(e.target.value)}
+                    className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400"
+                  >
                     <option value="">MM</option>
 
                     {["00", "01", "02", "03", "04", "05", "06", "07", "08"].map(
@@ -1095,7 +1320,11 @@ const Register = () => {
                     AM / PM
                   </label>
 
-                  <select className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400">
+                  <select
+                    value={birthMeridiem}
+                    onChange={(e) => setBirthMeridiem(e.target.value)}
+                    className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400"
+                  >
                     <option value="AM">AM</option>
                     <option value="PM">PM</option>
                   </select>
@@ -1288,12 +1517,7 @@ const Register = () => {
             <div className="space-y-8 mb-8">
               <OptionGroup
                 title="Eating Habit"
-                options={[
-                  "Vegetarian",
-                  "Eggetarian",
-                  "Non-Vegetarian",
-                  "Vegan",
-                ]}
+                options={["Vegetarian", "Non Vegetarian", "Eggitarian"]}
                 value={eatingHabit}
                 onChange={setEatingHabit}
               />
@@ -1458,12 +1682,26 @@ const Register = () => {
           </div>
         )}
 
+        {submitError && (
+          <p className="mb-4 text-sm font-medium text-rose-600">
+            {submitError}
+          </p>
+        )}
+
         <ThemeBtnOne
           type="button"
-          disabled={!canContinue[step]}
+          disabled={!canContinue[step] || (isLastStep && isSubmitting)}
           onClick={handlePrimaryAction}
           className="w-full bg-rose-500 text-white py-4 px-4 rounded-full font-serif cursor-pointer"
-          text={isLastStep ? "Submit" : "Next"}
+          text={
+            isLastStep
+              ? isCreatingProfile
+                ? "Creating profile..."
+                : isUploadingPhotos
+                  ? "Uploading photos..."
+                  : "Submit"
+              : "Next"
+          }
         ></ThemeBtnOne>
       </div>
 

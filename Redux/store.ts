@@ -5,6 +5,11 @@ import { heightApi } from "./heightApi";
 import { qualificationApi } from "./qualificationApi";
 import { occupationApi } from "./occupationApi";
 import { annualIncomeApi } from "./annualIncomeApi";
+import { religionApi } from "./religionApi";
+import { casteApi } from "./casteApi";
+import { subCasteApi } from "./subCasteApi";
+import { motherTongueApi } from "./motherToungeApi";
+import { profileApi } from "./profileApi";
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +17,11 @@ export const store = configureStore({
     [qualificationApi.reducerPath]: qualificationApi.reducer,
     [occupationApi.reducerPath]: occupationApi.reducer,
     [annualIncomeApi.reducerPath]: annualIncomeApi.reducer,
+    [religionApi.reducerPath]: religionApi.reducer,
+    [casteApi.reducerPath]: casteApi.reducer,
+    [subCasteApi.reducerPath]: subCasteApi.reducer,
+    [motherTongueApi.reducerPath]: motherTongueApi.reducer,
+    [profileApi.reducerPath]: profileApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -19,6 +29,11 @@ export const store = configureStore({
       qualificationApi.middleware,
       occupationApi.middleware,
       annualIncomeApi.middleware,
+      religionApi.middleware,
+      casteApi.middleware,
+      subCasteApi.middleware,
+      motherTongueApi.middleware,
+      profileApi.middleware,
     ),
 });
 
