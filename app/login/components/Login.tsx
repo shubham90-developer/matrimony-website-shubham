@@ -11,6 +11,8 @@ import {
   useResendOtpMutation,
 } from "@/Redux/authApi";
 
+import countriesData from "world-countries";
+
 type Step = "phone" | "otp" | "success";
 
 type Country = {
@@ -20,22 +22,21 @@ type Country = {
   name: string;
 };
 
-const FALLBACK_COUNTRIES: Country[] = [
-  { code: "IN", dialCode: "+91", flag: "🇮🇳", name: "India" },
-  { code: "US", dialCode: "+1", flag: "🇺🇸", name: "United States" },
-  { code: "GB", dialCode: "+44", flag: "🇬🇧", name: "United Kingdom" },
-  { code: "AE", dialCode: "+971", flag: "🇦🇪", name: "United Arab Emirates" },
-  { code: "AU", dialCode: "+61", flag: "🇦🇺", name: "Australia" },
-];
+const FALLBACK_COUNTRIES: Country[] = countriesData
+  .filter((c) => c.idd?.root)
+  .map((c) => ({
+    code: c.cca2,
+    dialCode: `${c.idd.root}${c.idd.suffixes?.[0] ?? ""}`,
+    flag: c.flag,
+    name: c.name.common,
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+const DEFAULT_COUNTRY: Country =
+  FALLBACK_COUNTRIES.find((c) => c.code === "IN") ?? FALLBACK_COUNTRIES[0];
 
 const OTP_LENGTH = 4;
 const RESEND_SECONDS = 29;
-
-function flagFromCode(cca2: string) {
-  return cca2
-    .toUpperCase()
-    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
-}
 
 const Login = () => {
   const [sendOtp, { isLoading: sendingOtp }] = useSendOtpMutation();
@@ -51,42 +52,11 @@ const Login = () => {
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
 
-  const [countries, setCountries] = useState<Country[]>(FALLBACK_COUNTRIES);
-  const [country, setCountry] = useState<Country>(FALLBACK_COUNTRIES[0]);
+  const [countries] = useState<Country[]>(FALLBACK_COUNTRIES);
+  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [countryOpen, setCountryOpen] = useState(false);
   const [countryQuery, setCountryQuery] = useState("");
-  const [loadingCountries, setLoadingCountries] = useState(true);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("https://restcountries.com/v3.1/all?fields=name,idd,cca2,flag")
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled || !Array.isArray(data)) return;
-        const parsed: Country[] = data
-          .filter((c) => c?.idd?.root)
-          .map((c) => ({
-            code: c.cca2,
-            dialCode: `${c.idd.root}${c.idd.suffixes?.[0] ?? ""}`,
-            flag: c.flag || flagFromCode(c.cca2),
-            name: c.name?.common ?? c.cca2,
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        if (parsed.length) {
-          setCountries(parsed);
-          const india = parsed.find((c) => c.code === "IN");
-          if (india) setCountry(india);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoadingCountries(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!countryOpen) return;
@@ -256,12 +226,7 @@ const Login = () => {
                       />
                     </div>
                     <div className="max-h-52 overflow-y-auto">
-                      {loadingCountries && (
-                        <p className="px-4 py-3 text-xs text-slate-400">
-                          Loading countries…
-                        </p>
-                      )}
-                      {filteredCountries.length === 0 && !loadingCountries && (
+                      {filteredCountries.length === 0 && (
                         <p className="px-4 py-3 text-xs text-slate-400">
                           No matches
                         </p>

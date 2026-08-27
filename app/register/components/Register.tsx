@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useRef, useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { useGetHeightsQuery } from "@/Redux/heightApi";
 import { useGetQualificationsQuery } from "@/Redux/qualificationApi";
 import { useGetOccupationsQuery } from "@/Redux/occupationApi";
@@ -21,6 +22,7 @@ import { useGetReligionsQuery } from "@/Redux/religionApi";
 import { useGetCastesByReligionQuery } from "@/Redux/casteApi";
 import { useGetSubCastesByCasteQuery } from "@/Redux/subCasteApi";
 import { useGetMotherTonguesQuery } from "@/Redux/motherToungeApi";
+import { Country, State, City } from "country-state-city";
 import {
   useAddProfileMutation,
   useUploadProfilePhotosMutation,
@@ -53,6 +55,39 @@ const STEPS = [
   "profileimages",
 ] as const;
 type StepKey = (typeof STEPS)[number];
+
+// Steps up to (but excluding) "horoscope" require every field on that step
+// to be filled before the user can move to Next. Steps from "horoscope"
+// onward remain optional, as requested.
+const HOROSCOPE_STEP_INDEX = STEPS.indexOf("horoscope");
+
+// Extracts a readable message out of a backend error response.
+// Handles the common Zod-style shape:
+// { success: false, message: "[{ ...  \"message\": \"Too small...\" }]" }
+// where `message` is itself a JSON-stringified array of issues.
+function getBackendErrorMessage(err: unknown, fallback: string): string {
+  const backendMessage = (err as { data?: { message?: unknown } })?.data
+    ?.message;
+
+  if (typeof backendMessage !== "string" || !backendMessage.trim()) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(backendMessage);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      // Join all issue messages so the user sees everything the backend flagged.
+      const messages = parsed
+        .map((issue) => issue?.message)
+        .filter((m): m is string => typeof m === "string" && m.length > 0);
+      if (messages.length) return messages.join(" ");
+    }
+  } catch {
+    // Not JSON — it's already a plain string message.
+  }
+
+  return backendMessage;
+}
 
 const Register = () => {
   const { data: heightsRes, isLoading: heightsLoading } = useGetHeightsQuery();
@@ -124,6 +159,12 @@ const Register = () => {
   const [country, setCountry] = useState("");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
+  // ISO codes are only needed to look up child dropdown options
+  // (country-state-city requires isoCode, not the display name).
+  // The plain-name state above (country/state/city) is what still
+  // gets saved into the payload, so nothing downstream changes.
+  const [countryIso, setCountryIso] = useState("");
+  const [stateIso, setStateIso] = useState("");
 
   const [familyStatus, setFamilyStatus] = useState("");
   const [brothers, setBrothers] = useState("");
@@ -145,6 +186,9 @@ const Register = () => {
   const [drinkingHabit, setDrinkingHabit] = useState("");
 
   const [birthState, setBirthState] = useState("");
+  // Same ISO-lookup pattern as the location step above, scoped to birth place.
+  const [birthCountryIso, setBirthCountryIso] = useState("");
+  const [birthStateIso, setBirthStateIso] = useState("");
   const [timeCorrection, setTimeCorrection] = useState("");
   const [nakshatra, setNakshatra] = useState("");
   const [rashi, setRashi] = useState("");
@@ -152,8 +196,11 @@ const Register = () => {
   // NEW: was missing state — the horoscope step's Date of Birth input and
   // Hour/Minute/AM-PM selects had no value/onChange at all before.
   const [horoscopeDob, setHoroscopeDob] = useState("");
-  const [birthHour, setBirthHour] = useState("");
-  const [birthMinute, setBirthMinute] = useState("");
+  // Defaulted to "01" (not "") since the backend requires hour >= 1 and the
+  // horoscope step is intentionally optional in the UI — this guarantees a
+  // valid value is always submitted even if the user skips this step.
+  const [birthHour, setBirthHour] = useState("01");
+  const [birthMinute, setBirthMinute] = useState("00");
   const [birthMeridiem, setBirthMeridiem] = useState("AM");
 
   const [about, setAbout] = useState("");
@@ -268,6 +315,20 @@ const Register = () => {
     "Awaiting Divorce",
   ];
 
+  // ---------- country-state-city data, derived per current selection ----------
+  const countryList = Country.getAllCountries();
+  const stateList = countryIso ? State.getStatesOfCountry(countryIso) : [];
+  const cityList =
+    countryIso && stateIso ? City.getCitiesOfState(countryIso, stateIso) : [];
+
+  const birthStateList = birthCountryIso
+    ? State.getStatesOfCountry(birthCountryIso)
+    : [];
+  const birthCityList =
+    birthCountryIso && birthStateIso
+      ? City.getCitiesOfState(birthCountryIso, birthStateIso)
+      : [];
+
   const OptionGroup = ({
     title,
     options,
@@ -301,6 +362,8 @@ const Register = () => {
     </div>
   );
 
+  // Steps before "horoscope" now require every field on that step to be
+  // filled in. "horoscope" itself and everything after it stays optional.
   const canContinue: Record<StepKey, boolean> = {
     profile: !!profileFor && !!gender,
 
@@ -309,12 +372,31 @@ const Register = () => {
     birthplace:
       !!birthDay && !!birthMonth && !!birthYear && !!height && !!maritalStatus,
 
-    education: qualification.trim().length > 0,
+    education:
+      qualification.trim().length > 0 &&
+      educationType.trim().length > 0 &&
+      occupation.trim().length > 0 &&
+      annualIncome.trim().length > 0,
 
-    religion: true,
-    location: true,
-    additional: true,
-    family: true,
+    religion:
+      !!religionId &&
+      !!casteId &&
+      subCaste.trim().length > 0 &&
+      !!dosh &&
+      motherTongue.trim().length > 0,
+
+    location: !!country && !!state && !!city,
+
+    additional:
+      !!familyStatus &&
+      !!brothers &&
+      !!marriedBrothers &&
+      !!sisters &&
+      !!marriedSisters,
+
+    family: !!livingWithFamily && familyBasedOutOf.trim().length > 0,
+
+    // Optional from here on, as requested.
     horoscope: true,
     birth: true,
     habbits: true,
@@ -363,7 +445,10 @@ const Register = () => {
     },
     horoscopeDetails: {
       birthTime: {
-        hour: Number(birthHour) || 0,
+        // birthHour/birthMinute default to "01"/"00" so this is always a
+        // valid, non-zero hour even when the (optional) horoscope step is
+        // skipped entirely — avoids the backend's "hour >= 1" validation error.
+        hour: Number(birthHour) || 1,
         minute: Number(birthMinute) || 0,
         meridiem: birthMeridiem,
       },
@@ -464,17 +549,26 @@ const Register = () => {
           try {
             await uploadProfilePhotos(images.map((img) => img.file)).unwrap();
           } catch (photoErr) {
-            setSubmitError(
+            const photoMsg = getBackendErrorMessage(
+              photoErr,
               "Your profile was created, but photo upload failed. You can add photos later from your profile.",
             );
+            setSubmitError(photoMsg);
+            toast.error(photoMsg);
             return;
           }
         }
 
+        toast.success("Profile created successfully!");
         // Success — e.g. redirect to the newly created profile / dashboard.
         // router.push("/my-profile") if using next/navigation's useRouter.
       } catch (err) {
-        setSubmitError("Failed to create your profile. Please try again.");
+        const message = getBackendErrorMessage(
+          err,
+          "Failed to create your profile. Please try again.",
+        );
+        setSubmitError(message);
+        toast.error(message);
       }
       return;
     }
@@ -483,6 +577,8 @@ const Register = () => {
 
   return (
     <div className="w-full min-h-screen bg-[#FDF8F3] py-12 px-5 sm:px-8 lg:px-8 flex justify-center items-start">
+      <Toaster position="top-center" reverseOrder={false} />
+
       <div className="mx-auto w-full max-w-3xl rounded-3xl bg-white p-8 py-10 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)]">
         <div className="flex items-center justify-between mb-8">
           {stepIndex > 0 ? (
@@ -992,8 +1088,7 @@ const Register = () => {
               {/* Dosh */}
               <div>
                 <h2 className="mb-3 text-md font-bold text-slate-900">
-                  Do you have any dosh?{" "}
-                  <span className="text-slate-400">(Optional)</span>
+                  Do you have any dosh?
                 </h2>
 
                 <div className="flex flex-wrap gap-3">
@@ -1056,26 +1151,24 @@ const Register = () => {
                 </label>
 
                 <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
+                  value={countryIso}
+                  onChange={(e) => {
+                    const iso = e.target.value;
+                    const selected = countryList.find((c) => c.isoCode === iso);
+                    setCountryIso(iso);
+                    setCountry(selected?.name ?? "");
+                    // Reset dependent selections since they belong to the old country
+                    setStateIso("");
+                    setState("");
+                    setCity("");
+                  }}
                   className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
                 >
                   <option value="">Select Country</option>
 
-                  {[
-                    "India",
-                    "United States",
-                    "Canada",
-                    "United Kingdom",
-                    "Australia",
-                    "UAE",
-                    "Singapore",
-                    "Germany",
-                    "France",
-                    "Japan",
-                  ].map((item) => (
-                    <option key={item} value={item}>
-                      {item}
+                  {countryList.map((c) => (
+                    <option key={c.isoCode} value={c.isoCode}>
+                      {c.name}
                     </option>
                   ))}
                 </select>
@@ -1088,26 +1181,25 @@ const Register = () => {
                 </label>
 
                 <select
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
+                  value={stateIso}
+                  onChange={(e) => {
+                    const iso = e.target.value;
+                    const selected = stateList.find((s) => s.isoCode === iso);
+                    setStateIso(iso);
+                    setState(selected?.name ?? "");
+                    // Reset city since it belongs to the old state
+                    setCity("");
+                  }}
+                  disabled={!countryIso}
+                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
                 >
-                  <option value="">Select State</option>
+                  <option value="">
+                    {countryIso ? "Select State" : "Select country first"}
+                  </option>
 
-                  {[
-                    "Maharashtra",
-                    "Gujarat",
-                    "Delhi",
-                    "Karnataka",
-                    "Tamil Nadu",
-                    "Uttar Pradesh",
-                    "Madhya Pradesh",
-                    "Rajasthan",
-                    "Punjab",
-                    "West Bengal",
-                  ].map((item) => (
-                    <option key={item} value={item}>
-                      {item}
+                  {stateList.map((s) => (
+                    <option key={s.isoCode} value={s.isoCode}>
+                      {s.name}
                     </option>
                   ))}
                 </select>
@@ -1122,24 +1214,16 @@ const Register = () => {
                 <select
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
+                  disabled={!stateIso}
+                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
                 >
-                  <option value="">Select City</option>
+                  <option value="">
+                    {stateIso ? "Select City" : "Select state first"}
+                  </option>
 
-                  {[
-                    "Mumbai",
-                    "Pune",
-                    "Delhi",
-                    "Bengaluru",
-                    "Hyderabad",
-                    "Chennai",
-                    "Ahmedabad",
-                    "Jaipur",
-                    "Lucknow",
-                    "Kolkata",
-                  ].map((item) => (
-                    <option key={item} value={item}>
-                      {item}
+                  {cityList.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
                     </option>
                   ))}
                 </select>
@@ -1279,8 +1363,6 @@ const Register = () => {
                     onChange={(e) => setBirthHour(e.target.value)}
                     className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400"
                   >
-                    <option value="">HH</option>
-
                     {["01", "02", "03", "04", "05", "06", "07", "08"].map(
                       (hour) => (
                         <option key={hour} value={hour}>
@@ -1302,8 +1384,6 @@ const Register = () => {
                     onChange={(e) => setBirthMinute(e.target.value)}
                     className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400"
                   >
-                    <option value="">MM</option>
-
                     {["00", "01", "02", "03", "04", "05", "06", "07", "08"].map(
                       (minute) => (
                         <option key={minute} value={minute}>
@@ -1351,22 +1431,24 @@ const Register = () => {
               </label>
 
               <select
-                value={birthCountry}
-                onChange={(e) => setBirthCountry(e.target.value)}
+                value={birthCountryIso}
+                onChange={(e) => {
+                  const iso = e.target.value;
+                  const selected = countryList.find((c) => c.isoCode === iso);
+                  setBirthCountryIso(iso);
+                  setBirthCountry(selected?.name ?? "");
+                  // Reset dependent selections since they belong to the old country
+                  setBirthStateIso("");
+                  setBirthState("");
+                  setBirthCity("");
+                }}
                 className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
               >
                 <option value="">Select Country</option>
 
-                {[
-                  "India",
-                  "United States",
-                  "Canada",
-                  "United Kingdom",
-                  "Australia",
-                  "UAE",
-                ].map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                {countryList.map((c) => (
+                  <option key={c.isoCode} value={c.isoCode}>
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -1379,20 +1461,28 @@ const Register = () => {
               </label>
 
               <select
-                value={birthState}
-                onChange={(e) => setBirthState(e.target.value)}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
+                value={birthStateIso}
+                onChange={(e) => {
+                  const iso = e.target.value;
+                  const selected = birthStateList.find(
+                    (s) => s.isoCode === iso,
+                  );
+                  setBirthStateIso(iso);
+                  setBirthState(selected?.name ?? "");
+                  // Reset city since it belongs to the old state
+                  setBirthCity("");
+                }}
+                disabled={!birthCountryIso}
+                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
               >
-                <option value="">Select State</option>
+                <option value="">
+                  {birthCountryIso ? "Select State" : "Select country first"}
+                </option>
 
-                {[
-                  "Maharashtra",
-                  "Gujarat",
-                  "Karnataka",
-                  "Tamil Nadu",
-                  "Delhi",
-                ].map((item) => (
-                  <option key={item}>{item}</option>
+                {birthStateList.map((s) => (
+                  <option key={s.isoCode} value={s.isoCode}>
+                    {s.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -1406,15 +1496,18 @@ const Register = () => {
               <select
                 value={birthCity}
                 onChange={(e) => setBirthCity(e.target.value)}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
+                disabled={!birthStateIso}
+                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
               >
-                <option value="">Select City</option>
+                <option value="">
+                  {birthStateIso ? "Select City" : "Select state first"}
+                </option>
 
-                {["Mumbai", "Pune", "Delhi", "Ahmedabad", "Bengaluru"].map(
-                  (item) => (
-                    <option key={item}>{item}</option>
-                  ),
-                )}
+                {birthCityList.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
             </div>
 
