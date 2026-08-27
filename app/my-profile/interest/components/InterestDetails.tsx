@@ -3,8 +3,16 @@
 import ThemeBtnOne from "@/app/components/ThemeBtnOne";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+import {
+  useGetMyProfileQuery,
+  useUpdateProfileMutation,
+} from "@/Redux/profileApi";
+import { useGetMotherTonguesQuery } from "@/Redux/motherToungeApi";
 
+// ---------- multi-select group (true array backend fields) ----------
 type OptionGroupProps = {
   title: string;
   options: string[];
@@ -49,24 +57,155 @@ const OptionGroup = ({ title, options, value, onChange }: OptionGroupProps) => {
   );
 };
 
+// ---------- single-select group (backend stores these as one string) ----------
+type SingleOptionGroupProps = {
+  title: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+};
+
+const SingleOptionGroup = ({
+  title,
+  options,
+  value,
+  onChange,
+}: SingleOptionGroupProps) => {
+  return (
+    <div>
+      <h2 className="mb-3 text-md font-bold text-slate-900">{title}</h2>
+
+      <div className="flex flex-wrap gap-3">
+        {options.map((item) => {
+          const selected = value === item;
+
+          return (
+            <button
+              key={item}
+              type="button"
+              onClick={() => onChange(selected ? "" : item)}
+              className={`rounded-full border px-5 py-2.5 text-sm font-semibold transition cursor-pointer ${
+                selected
+                  ? "border-rose-400 bg-rose-50 text-rose-600"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+              }`}
+            >
+              {item}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const InterestDetails = () => {
-  const [eatingHabit, setEatingHabit] = useState<string[]>([]);
-  const [smokingHabit, setSmokingHabit] = useState<string[]>([]);
-  const [drinkingHabit, setDrinkingHabit] = useState<string[]>([]);
+  const router = useRouter();
+  const { data, isLoading, isError } = useGetMyProfileQuery();
+  const [updateProfile, { isLoading: isSaving }] = useUpdateProfileMutation();
+  const { data: motherTongueRes } = useGetMotherTonguesQuery();
+
+  // single-string backend fields
+  const [eatingHabit, setEatingHabit] = useState("");
+  const [smokingHabit, setSmokingHabit] = useState("");
+  const [drinkingHabit, setDrinkingHabit] = useState("");
+  const [cook, setCook] = useState("");
+  const [dress, setDress] = useState("");
+
+  // true array backend fields
   const [assets, setAssets] = useState<string[]>([]);
   const [hobbies, setHobbies] = useState<string[]>([]);
-  const [intrest, setIntrest] = useState<string[]>([]);
   const [language, setLanguage] = useState<string[]>([]);
-  const [cook, setCook] = useState<string[]>([]);
   const [cuisine, setCuisine] = useState<string[]>([]);
   const [music, setMusic] = useState<string[]>([]);
-  const [dress, setDress] = useState<string[]>([]);
   const [sports, setSports] = useState<string[]>([]);
   const [read, setRead] = useState<string[]>([]);
   const [book, setBook] = useState<string[]>([]);
   const [movies, setMovies] = useState<string[]>([]);
   const [TvShow, setTvShow] = useState<string[]>([]);
+
+  // no backend field for these two yet — local only
+  const [intrest, setIntrest] = useState<string[]>([]);
   const [destination, setDestination] = useState<string[]>([]);
+
+  // ---------- pre-fill once profile loads ----------
+  useEffect(() => {
+    if (!data?.data) return;
+    const p = data.data;
+    const l = p.lifestyle;
+    const a = p.aboutMe;
+
+    setEatingHabit(l?.dietaryHabit || "");
+    setSmokingHabit(l?.smokingHabit || "");
+    setDrinkingHabit(l?.drinkingHabit || "");
+    setCook(l?.foodICook || "");
+    setDress(l?.dressStyle || "");
+
+    setAssets([
+      ...(l?.ownHouse ? ["Own House"] : []),
+      ...(l?.ownCar ? ["Own Car"] : []),
+    ]);
+    setHobbies(l?.hobbies || []);
+    setLanguage(a?.languagesISpeak || []);
+    setCuisine(l?.cuisine || []);
+    setMusic(l?.favouriteMusic || []);
+    setSports(l?.sports || []);
+    setRead(l?.favouriteRead || []);
+    setBook(l?.favouriteBooks || []);
+    setMovies(l?.movies || []);
+    setTvShow(l?.tvShow || []);
+  }, [data]);
+
+  const handleUpdate = async () => {
+    if (!data?.data) return;
+    const existing = data.data;
+
+    try {
+      await updateProfile({
+        lifestyle: {
+          ...(existing.lifestyle || {}),
+          dietaryHabit: eatingHabit,
+          smokingHabit,
+          drinkingHabit,
+          openToPets: existing.lifestyle?.openToPets ?? false,
+          ownHouse: assets.includes("Own House"),
+          ownCar: assets.includes("Own Car"),
+          foodICook: cook,
+          hobbies,
+          favouriteMusic: music,
+          favouriteBooks: book,
+          dressStyle: dress,
+          sports,
+          cuisine,
+          movies,
+          favouriteRead: read,
+          tvShow: TvShow,
+        },
+        aboutMe: {
+          ...(existing.aboutMe || {}),
+          languagesISpeak: language,
+        },
+      }).unwrap();
+      toast.success("Profile updated successfully");
+      router.push("/my-profile");
+    } catch (err) {
+      toast.error("Failed to update profile");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center text-sm text-slate-500">Loading...</div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-8 text-center text-sm text-rose-500">
+        Could not load profile.
+      </div>
+    );
+  }
 
   return (
     <>
@@ -86,31 +225,21 @@ const InterestDetails = () => {
         <div>
           <div className="space-y-4 mb-10 ">
             <div className="space-y-8 mb-8">
-              <OptionGroup
+              <SingleOptionGroup
                 title="Eating Habit"
-                options={[
-                  "Vegetarian",
-                  "Eggetarian",
-                  "Non-Vegetarian",
-                  "Vegan",
-                ]}
+                options={["Vegetarian", "Non Vegetarian", "Eggitarian"]}
                 value={eatingHabit}
                 onChange={setEatingHabit}
               />
 
-              <OptionGroup
+              <SingleOptionGroup
                 title="Smoking Habit"
-                options={[
-                  "Never",
-                  "Occasionally",
-                  "Regularly",
-                  "Trying to Quit",
-                ]}
+                options={["Never", "Occasionally", "Regularly"]}
                 value={smokingHabit}
                 onChange={setSmokingHabit}
               />
 
-              <OptionGroup
+              <SingleOptionGroup
                 title="Drinking Habit"
                 options={["Never", "Occasionally", "Socially", "Regularly"]}
                 value={drinkingHabit}
@@ -203,7 +332,7 @@ const InterestDetails = () => {
                 onChange={setHobbies}
               />
 
-              <OptionGroup
+              {/* <OptionGroup
                 title="Interest"
                 options={[
                   "Traveling",
@@ -229,29 +358,16 @@ const InterestDetails = () => {
                 ]}
                 value={intrest}
                 onChange={setIntrest}
-              />
+              /> */}
 
               <OptionGroup
                 title="Languages"
-                options={[
-                  "English",
-                  "Hindi",
-                  "Marathi",
-                  "Gujarati",
-                  "Punjabi",
-                  "Tamil",
-                  "Telugu",
-                  "Kannada",
-                  "Malayalam",
-                  "Bengali",
-                  "Urdu",
-                  "Sanskrit",
-                ]}
+                options={motherTongueRes?.data.map((m) => m.motherTongue) || []}
                 value={language}
                 onChange={setLanguage}
               />
 
-              <OptionGroup
+              <SingleOptionGroup
                 title="Cooking"
                 options={[
                   "Excellent",
@@ -305,7 +421,7 @@ const InterestDetails = () => {
                 onChange={setMusic}
               />
 
-              <OptionGroup
+              <SingleOptionGroup
                 title="Dress Style"
                 options={[
                   "Traditional",
@@ -402,7 +518,7 @@ const InterestDetails = () => {
                 onChange={setTvShow}
               />
 
-              <OptionGroup
+              {/* <OptionGroup
                 title="Dream Destination"
                 options={[
                   "Goa",
@@ -423,12 +539,14 @@ const InterestDetails = () => {
                 ]}
                 value={destination}
                 onChange={setDestination}
-              />
+              /> */}
             </div>
           </div>
           <div className="flex justify-end">
             <ThemeBtnOne
-              text="Update"
+              text={isSaving ? "Updating..." : "Update"}
+              disabled={isSaving}
+              onClick={handleUpdate}
               className="mt-4 bg-rose-500 text-white px-3 py-2 font-serif rounded-full cursor-pointer"
             />
           </div>
