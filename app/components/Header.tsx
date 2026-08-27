@@ -14,16 +14,13 @@ import {
   Briefcase,
   Map,
   Plane,
+  UserCircle,
   GraduationCap,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import ThemeBtnOne from "./ThemeBtnOne";
 import Logo from "./Logo";
-
-/* ------------------------------------------------------------------ */
-/* Data                                                                */
-/* ------------------------------------------------------------------ */
 
 type BrowseCategory = {
   key: string;
@@ -214,13 +211,10 @@ const SEARCH_LINKS: SearchLink[] = [
   },
 ];
 
-/* ------------------------------------------------------------------ */
-/* Component                                                           */
-/* ------------------------------------------------------------------ */
-
 type DesktopMenu = "browse" | "search" | null;
 
 const Header = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [openMenu, setOpenMenu] = useState<DesktopMenu>(null);
   const [activeCategory, setActiveCategory] = useState<string>(
     BROWSE_CATEGORIES[0].key,
@@ -232,6 +226,16 @@ const Header = () => {
   >(null);
 
   const navRef = useRef<HTMLDivElement>(null);
+
+  // Check login state on mount + keep in sync across tabs
+  useEffect(() => {
+    const checkToken = () => {
+      setIsLoggedIn(!!localStorage.getItem("accessToken"));
+    };
+    checkToken();
+    window.addEventListener("storage", checkToken);
+    return () => window.removeEventListener("storage", checkToken);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -422,28 +426,42 @@ const Header = () => {
 
         {/* Right side actions (desktop) */}
         <div className="hidden items-center gap-5 lg:flex">
-          <Link
-            href="/login"
-            className="text-[15px] font-semibold text-rose-600 transition-colors hover:text-rose-700 cursor-pointer  font-serif tracking-wider"
-          >
-            Login
-          </Link>
-          <ThemeBtnOne
-            text="Register"
-            url="/register"
-            icon={<Users className="h-4 w-4" />}
-            className="py-3 px-4 rounded-full font-serif  bg-rose-500 text-white"
-          />
+          {isLoggedIn ? (
+            <Link
+              href="/my-profile"
+              aria-label="My Profile"
+              className="flex items-center justify-center text-rose-600 hover:text-rose-700 transition-colors cursor-pointer"
+            >
+              <UserCircle className="h-8 w-8" />
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="text-[15px] font-semibold text-rose-600 transition-colors hover:text-rose-700 cursor-pointer  font-serif tracking-wider"
+            >
+              Login
+            </Link>
+          )}
         </div>
 
-        {/* Mobile: Login + hamburger */}
+        {/* Mobile: Login/Profile + hamburger */}
         <div className="flex items-center gap-3 lg:hidden">
-          <Link
-            href="/login"
-            className="text-sm font-semibold text-rose-600  font-serif tracking-wider cursor-pointer"
-          >
-            Login
-          </Link>
+          {isLoggedIn ? (
+            <Link
+              href="/my-profile"
+              aria-label="My Profile"
+              className="flex items-center justify-center text-rose-600"
+            >
+              <UserCircle className="h-6 w-6" />
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="text-sm font-semibold text-rose-600  font-serif tracking-wider cursor-pointer"
+            >
+              Login
+            </Link>
+          )}
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
@@ -573,12 +591,24 @@ const Header = () => {
 
             {/* Sticky CTA */}
             <div className="border-t border-slate-100 p-4">
-              <Link
-                href="/register"
-                className="block w-full rounded-full bg-rose-600 px-6 py-3 text-center text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-rose-700"
-              >
-                Register for Free
-              </Link>
+              {isLoggedIn ? (
+                <Link
+                  href="/my-profile"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-center gap-2 w-full rounded-full bg-rose-600 px-6 py-3 text-center text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-rose-700"
+                >
+                  <UserCircle className="h-5 w-5" />
+                  My Profile
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="block w-full rounded-full bg-rose-600 px-6 py-3 text-center text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-rose-700"
+                >
+                  Login
+                </Link>
+              )}
             </div>
           </div>
         </div>

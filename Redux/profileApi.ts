@@ -1,7 +1,6 @@
 // profileApi.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
-// ---------- Nested Types (matches the real POST body schema) ----------
 export interface BasicDetails {
   profileFor: string;
   gender: string;
@@ -186,13 +185,14 @@ if (!API_BASE_URL) {
 // ---------- API slice ----------
 export const profileApi = createApi({
   reducerPath: "profileApi",
+
+  tagTypes: ["Profile"],
   baseQuery: fetchBaseQuery({
     baseUrl: API_BASE_URL,
     prepareHeaders: (headers) => {
       const token = localStorage.getItem("accessToken");
       if (token) headers.set("Authorization", `Bearer ${token}`);
-      // Do NOT set Content-Type manually — needed so the browser can set
-      // its own multipart boundary for the photo-upload endpoint below.
+
       return headers;
     },
   }),
@@ -204,10 +204,9 @@ export const profileApi = createApi({
         method: "POST",
         body,
       }),
+      invalidatesTags: ["Profile"],
     }),
 
-    // STEP 2 — upload up to 6 photos for the just-created profile.
-    // Backend identifies the profile via the auth token, not a path param.
     uploadProfilePhotos: builder.mutation<ProfileResponse, File[]>({
       query: (photos) => {
         const formData = new FormData();
@@ -218,10 +217,30 @@ export const profileApi = createApi({
           body: formData,
         };
       },
+      invalidatesTags: ["Profile"],
     }),
 
     getMyProfile: builder.query<ProfileResponse, void>({
       query: () => "/profile/me",
+      providesTags: ["Profile"],
+    }),
+
+    updateProfile: builder.mutation<ProfileResponse, Partial<ProfilePayload>>({
+      query: (body) => ({
+        url: "/profile",
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["Profile"],
+    }),
+
+    // SOFT DELETE — PATCH /v1/api/profile.
+    deleteProfile: builder.mutation<ProfileResponse, void>({
+      query: () => ({
+        url: "/profile",
+        method: "PATCH",
+      }),
+      invalidatesTags: ["Profile"],
     }),
 
     removeProfilePhoto: builder.mutation<ProfileResponse, string>({
@@ -230,12 +249,15 @@ export const profileApi = createApi({
         method: "DELETE",
         body: { photoUrl },
       }),
+      invalidatesTags: ["Profile"],
     }),
   }),
 });
 
 export const {
   useAddProfileMutation,
+  useUpdateProfileMutation,
+  useDeleteProfileMutation,
   useUploadProfilePhotosMutation,
   useGetMyProfileQuery,
   useRemoveProfilePhotoMutation,

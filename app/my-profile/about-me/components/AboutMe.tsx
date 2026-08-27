@@ -1,9 +1,73 @@
+"use client";
+
 import ThemeBtnOne from "@/app/components/ThemeBtnOne";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+import {
+  useGetMyProfileQuery,
+  useUpdateProfileMutation,
+} from "@/Redux/profileApi";
 
 const AboutMe = () => {
+  const router = useRouter();
+  const { data, isLoading, isError } = useGetMyProfileQuery();
+  const [updateProfile, { isLoading: isSaving }] = useUpdateProfileMutation();
+
+  const [about, setAbout] = useState("");
+  const [profileCreatedBy, setProfileCreatedBy] = useState("self");
+  const [disability, setDisability] = useState("None");
+  const [thalassemia, setThalassemia] = useState("No");
+  const [hivStatus, setHivStatus] = useState(false);
+
+  // Pre-fill form once the existing profile loads
+  useEffect(() => {
+    if (data?.data) {
+      const p = data.data;
+      setAbout(p.aboutMe?.about || "");
+      setProfileCreatedBy(p.aboutMe?.profileCreatedBy || "self");
+      setDisability(p.aboutMe?.disability || "None");
+      setThalassemia(p.aboutMe?.thalassemia || "No");
+      setHivStatus(!!p.aboutMe?.hivStatus);
+    }
+  }, [data]);
+
+  const handleUpdate = async () => {
+    try {
+      await updateProfile({
+        aboutMe: {
+          about,
+          describeYourself: data?.data?.aboutMe?.describeYourself || "",
+          languagesISpeak: data?.data?.aboutMe?.languagesISpeak || [],
+          profileCreatedBy,
+          disability,
+          thalassemia,
+          hivStatus,
+        },
+      }).unwrap();
+      toast.success("Profile updated successfully");
+      router.push("/my-profile");
+    } catch (err) {
+      toast.error("Failed to update profile");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center text-sm text-slate-500">Loading...</div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-8 text-center text-sm text-rose-500">
+        Could not load profile.
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="rounded-xl border border-gray-200 p-4">
@@ -22,6 +86,8 @@ const AboutMe = () => {
         <div>
           <textarea
             rows={10}
+            value={about}
+            onChange={(e) => setAbout(e.target.value)}
             placeholder="Write something about yourself..."
             className="w-full rounded-lg border border-gray-200 p-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
           ></textarea>
@@ -31,8 +97,8 @@ const AboutMe = () => {
                 Profile Managed By
               </label>
               <select
-                name=""
-                id=""
+                value={profileCreatedBy}
+                onChange={(e) => setProfileCreatedBy(e.target.value)}
                 className="form-select w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-300 transition"
               >
                 <option value="self">Self</option>
@@ -46,12 +112,15 @@ const AboutMe = () => {
                 Disability ?
               </label>
               <select
-                name=""
-                id=""
+                value={disability}
+                onChange={(e) => setDisability(e.target.value)}
                 className="form-select w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-300 transition"
               >
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
+                <option value="None">None</option>
+                <option value="Physical">Physical</option>
+                <option value="Visual">Visual</option>
+                <option value="Hearing">Hearing</option>
+                <option value="Other">Other</option>
               </select>
             </div>
             <div>
@@ -59,12 +128,13 @@ const AboutMe = () => {
                 Thalassemia ?
               </label>
               <select
-                name=""
-                id=""
+                value={thalassemia}
+                onChange={(e) => setThalassemia(e.target.value)}
                 className="form-select w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-300 transition"
               >
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+                <option value="Trait / Minor">Trait / Minor</option>
               </select>
             </div>
             <div>
@@ -72,18 +142,19 @@ const AboutMe = () => {
                 HIV + ?
               </label>
               <select
-                name=""
-                id=""
+                value={hivStatus ? "yes" : "no"}
+                onChange={(e) => setHivStatus(e.target.value === "yes")}
                 className="form-select w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-300 transition"
               >
-                <option value="yes">Yes</option>
                 <option value="no">No</option>
+                <option value="yes">Yes</option>
               </select>
             </div>
           </div>
           <div className="flex justify-end">
             <ThemeBtnOne
-              text="Update"
+              text={isSaving ? "Updating..." : "Update"}
+              onClick={handleUpdate}
               className="mt-4 bg-rose-500 text-white px-3 py-2 font-serif rounded-full cursor-pointer"
             />
           </div>

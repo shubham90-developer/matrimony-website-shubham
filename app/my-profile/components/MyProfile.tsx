@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useGetMyProfileQuery } from "@/Redux/profileApi";
 
 const SectionCard = ({
   title,
@@ -78,56 +79,78 @@ const EDIT_ROUTES = {
 
 const MyProfile = () => {
   const [tab, setTab] = useState("about");
+  const { data, isLoading, isError } = useGetMyProfileQuery();
+  const apiProfile = data?.data;
 
+  if (isLoading) {
+    return (
+      <div className="p-8 text-center text-sm text-stone-500">
+        Loading profile...
+      </div>
+    );
+  }
+
+  if (isError || !apiProfile) {
+    return (
+      <div className="p-8 text-center text-sm text-rose-500">
+        Could not load profile. Please try again later.
+      </div>
+    );
+  }
+
+  // ---- Map API shape to the same flat shape the UI below expects ----
   const profile = {
-    name: "Aarav Deshmukh",
-    id: "UXZ48213",
-    img: "/img/matches/1.jpg",
-    height: "5'9\" (1.75 m)",
-    community: "Maratha - 96 Kuli Maratha",
-    motherTongue: "Marathi",
-    location: "Pune, Maharashtra, India",
-    income: "Rs. 8 - 12 Lakh p.a.",
-    dob: "14 May 1996",
-    maritalStatus: "Never Married",
-    bio: "I work in software product design. I completed my B.E. and am currently working as a UX Professional at a mid-size tech company. Looking to build a life with someone who values honesty and growth.",
-    disability: "No",
-    thalassemia: "No, HbA2 - No",
+    name: `${apiProfile.basicDetails.firstName} ${apiProfile.basicDetails.lastName}`,
+    id: apiProfile.matrimonyId,
+    img: apiProfile.photos?.[0] || "/img/matches/1.jpg",
+    height: apiProfile.basicDetails.height,
+    community: `${apiProfile.religionDetails.caste}${
+      apiProfile.religionDetails.subCaste
+        ? " - " + apiProfile.religionDetails.subCaste
+        : ""
+    }`,
+    motherTongue: apiProfile.religionDetails.motherTongue,
+    location: `${apiProfile.locationDetails.city}, ${apiProfile.locationDetails.state}, ${apiProfile.locationDetails.country}`,
+    income: apiProfile.educationDetails.annualIncome,
+    dob: apiProfile.basicDetails.dob,
+    maritalStatus: apiProfile.basicDetails.maritalStatus,
+    bio: apiProfile.aboutMe.about,
+    disability: apiProfile.aboutMe.disability || "No",
+    thalassemia: apiProfile.aboutMe.thalassemia || "No",
     education: [
       {
-        degree: "B.E. / B.Tech - Undergraduate Degree",
-        school: "Savitribai Phule Pune University",
+        degree: apiProfile.education.highestDegree,
+        school: apiProfile.education.school,
       },
-      { degree: "High School", school: "Savitribai Phule Pune University" },
     ],
     career: {
-      title: "UX Professional",
-      company: "at a Technology Group - Private Sector",
-      about:
-        "I am interested in building my career in product design and eventually leading a design team.",
-      settleAbroad: "Not interested in settling abroad",
+      title: apiProfile.careerDetails.occupation,
+      company: apiProfile.careerDetails.organizationName,
+      about: apiProfile.education.aboutEducation,
+      settleAbroad: apiProfile.careerDetails.interestedInSettlingAbroad
+        ? "Interested in settling abroad"
+        : "Not interested in settling abroad",
     },
     family: {
-      type: "Upper middle class nuclear family from Pune, Maharashtra, India",
-      values: "Moderate",
-      father: "Father is retired, mother is a homemaker",
-      siblings: "1 sibling (married)",
-      about:
-        "There are four members in my family. My father is retired, my mother is a homemaker, and I have one married sibling.",
-      livingWithParents: false,
+      type: `${apiProfile.family.familyType} family from ${apiProfile.family.familyBasedOutOf}`,
+      values: apiProfile.family.familyValue,
+      father: `Father's occupation - ${apiProfile.family.fatherOccupation}`,
+      siblings: `${apiProfile.family.brothers} brother(s), ${apiProfile.family.sisters} sister(s)`,
+      about: apiProfile.family.aboutFamily,
+      livingWithParents: apiProfile.family.livingWithParents,
     },
     contact: {
-      email: "name@example.com",
-      phone: "+91 90000 00000",
-      altPhone: "+91 90000 00001",
-      altEmail: "name.alt@example.com",
+      email: apiProfile.contactDetails.email,
+      phone: apiProfile.contactDetails.phoneNumber,
+      altPhone: apiProfile.contactDetails.alternatePhoneNumber,
+      altEmail: apiProfile.contactDetails.alternateEmail,
     },
     astro: {
-      rashi: "Kark - Non Manglik",
-      nakshatra: "Pushya / Poonam / Pooyam",
-      dob: "3 Aug 1997 - 00 Hrs 15 Mins",
-      birthPlace: "Born in Solapur, Maharashtra, India",
-      horoscopeMustMatch: true,
+      rashi: apiProfile.horoscopeDetails.starDetails.rashi,
+      nakshatra: apiProfile.horoscopeDetails.starDetails.nakshatra,
+      dob: `${apiProfile.basicDetails.dob} - ${apiProfile.horoscopeDetails.birthTime.hour} Hrs ${apiProfile.horoscopeDetails.birthTime.minute} Mins ${apiProfile.horoscopeDetails.birthTime.meridiem}`,
+      birthPlace: `Born in ${apiProfile.horoscopeDetails.birthPlace.city}, ${apiProfile.horoscopeDetails.birthPlace.state}, ${apiProfile.horoscopeDetails.birthPlace.country}`,
+      horoscopeMustMatch: apiProfile.religionDetails.hasDosh,
     },
   };
 
