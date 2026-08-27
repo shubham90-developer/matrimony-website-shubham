@@ -6,6 +6,7 @@ import {
   ChevronRight,
   GraduationCap,
   Languages,
+  Loader2,
   Mail,
   MessageCircle,
   Send,
@@ -16,10 +17,22 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useMemo, useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
+import {
+  useGetMyProfileQuery,
+  useGetProfileFeedQuery,
+  type Profile as ApiProfile,
+  type ProfileFeedParams,
+} from "@/Redux/profileApi";
+import { useSendInterestMutation } from "@/Redux/interestApi";
+import { useAddToShortlistMutation } from "@/Redux/shortlistApi";
+import { useAddToIgnoreMutation } from "@/Redux/ignoreApi";
 
 interface Profile {
+  id: string;
+  userId: string;
   name: string;
   age: number;
   status: "Online" | "Active Today" | string;
@@ -37,66 +50,108 @@ interface Profile {
   images: string[];
 }
 
-const PROFILES: Profile[] = [
-  {
-    name: "Ruhi Deshmukh",
-    age: 28,
-    status: "Online",
-    tag: "Just Joined",
-    height: "5ft 3in",
-    city: "Nagpur",
-    community: "Kunbi-Kunbi- Tirale",
-    job: "Operator/Technician",
-    income: "Rs. 3 - 4 Lakh p.a",
-    edu: "B.Com",
-    marital: "Never Married",
-    religion: "Hindu",
-    caste: "Kunbi",
-    subcaste: "Kunbi",
-    images: ["/img/matches/1.jpg", "/img/matches/2.jpg", "/img/matches/3.jpg"],
-  },
-  {
-    name: "A",
-    age: 26,
+const FALLBACK_IMAGE = "/img/profile/1.jpg";
+const NEW_PROFILE_WINDOW_DAYS = 14;
+
+// Query params the Header's "Browse Profiles By" mega menu can set on
+// /my-matches/matches. Forwarded to the feed API as-is under these keys —
+// rename any of these once the real backend field names are confirmed.
+const FILTER_PARAM_KEYS = [
+  "religion",
+  "motherTongue",
+  "country",
+  "annualIncome",
+  "education",
+  "occupation",
+  "height",
+  "maritalStatus",
+  "manglik",
+] as const;
+
+const toCardProfile = (apiProfile: ApiProfile): Profile => {
+  const {
+    _id,
+    userId,
+    matrimonyId,
+    basicDetails,
+    educationDetails,
+    religionDetails,
+    locationDetails,
+    careerDetails,
+    photos,
+    createdAt,
+  } = apiProfile;
+
+  const community = [religionDetails?.caste, religionDetails?.subCaste]
+    .filter(Boolean)
+    .join("-");
+
+  const isRecentlyJoined = createdAt
+    ? (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24) <=
+      NEW_PROFILE_WINDOW_DAYS
+    : false;
+
+  return {
+    id: matrimonyId || _id,
+    userId: userId || _id,
+    name: `${basicDetails?.firstName ?? ""} ${basicDetails?.lastName ?? ""}`.trim(),
+    age: basicDetails?.age ?? 0,
     status: "Active Today",
-    tag: "Just Joined",
-    height: "5ft 3in",
-    city: "Pune/ Chinchwad",
-    community: "Maratha-96 Kuli Marat…",
-    job: "Others",
-    income: "Rs. 5 - 7.5 Lakh p.a",
-    edu: "B.E./B.Tech",
-    marital: "Never Married",
-    religion: "Hindu",
-    caste: "Kunbi",
-    subcaste: "Kunbi",
-    images: ["/img/matches/3.jpg", "/img/matches/1.jpg", "/img/matches/2.jpg"],
-  },
-];
+    tag: isRecentlyJoined ? "Just Joined" : undefined,
+    height: basicDetails?.height ?? "",
+    city: locationDetails?.city ?? "",
+    community,
+    job: careerDetails?.occupation || educationDetails?.occupation || "",
+    income: educationDetails?.annualIncome ?? "",
+    edu: educationDetails?.highestQualification ?? "",
+    marital: basicDetails?.maritalStatus ?? "",
+    religion: religionDetails?.religion ?? "",
+    caste: religionDetails?.caste ?? "",
+    subcaste: religionDetails?.subCaste ?? "",
+    images: photos && photos.length > 0 ? photos : [FALLBACK_IMAGE],
+  };
+};
+
+type ActionKey = "interest" | "shortlist" | "ignore" | "chat";
 
 /* Actions available on each card. `requiresPaid` marks actions that are
    blocked behind the paywall for "Just Joined" matches (Interest / Chat). */
-const ACTIONS = [
+const ACTIONS: {
+  key: ActionKey;
+  icon: typeof Mail;
+  label: string;
+  url: string;
+  requiresPaid: boolean;
+}[] = [
   {
+    key: "interest",
     icon: Mail,
     label: "Interest",
     url: "/my-matches/interest",
     requiresPaid: true,
   },
   {
+    key: "shortlist",
     icon: Star,
     label: "Shortlist",
     url: "/my-matches/shortlist",
     requiresPaid: false,
   },
-  { icon: X, label: "Ignore", url: "/my-matches/ignore", requiresPaid: false },
   {
+    key: "ignore",
+    icon: X,
+    label: "Ignore",
+    url: "/my-matches/ignore",
+    requiresPaid: false,
+  },
+  {
+    key: "chat",
     icon: MessageCircle,
     label: "Chat",
     url: "/my-matches/messenger",
     requiresPaid: false,
   },
-] as const;
+];
 
 /* ---------------- Upgrade / Paywall modal ---------------- */
 
@@ -314,13 +369,32 @@ function ImageLightbox({
 
 /* ---------------- Profile Card ---------------- */
 
-function ProfileCard({ p }: { p: Profile }) {
+function ProfileCard({
+  p,
+  onHide,
+}: {
+  p: Profile;
+  onHide: (userId: string) => void;
+}) {
   const router = useRouter();
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
-  const images = p.images?.length ? p.images : ["/img/profile/1.jpg"];
+  const [sendInterest, { isLoading: interestLoading }] =
+    useSendInterestMutation();
+  const [addToShortlist, { isLoading: shortlistLoading }] =
+    useAddToShortlistMutation();
+  const [addToIgnore, { isLoading: ignoreLoading }] = useAddToIgnoreMutation();
+
+  const actionLoading: Record<ActionKey, boolean> = {
+    interest: interestLoading,
+    shortlist: shortlistLoading,
+    ignore: ignoreLoading,
+    chat: false,
+  };
+
+  const images = p.images?.length ? p.images : [FALLBACK_IMAGE];
   const isJustJoined = p.tag === "Just Joined";
 
   const openLightbox = (e: React.MouseEvent) => {
@@ -331,7 +405,7 @@ function ProfileCard({ p }: { p: Profile }) {
     setLightboxOpen(true);
   };
 
-  const handleAction = (
+  const handleAction = async (
     e: React.MouseEvent,
     action: (typeof ACTIONS)[number],
   ) => {
@@ -344,13 +418,41 @@ function ProfileCard({ p }: { p: Profile }) {
       return;
     }
 
-    router.push(action.url);
+    if (actionLoading[action.key]) return;
+
+    try {
+      switch (action.key) {
+        case "interest":
+          await sendInterest({ receiverId: p.userId }).unwrap();
+          toast.success(`Interest sent to ${p.name}`);
+          onHide(p.userId);
+          return;
+        case "shortlist":
+          await addToShortlist({ shortlistedUserId: p.userId }).unwrap();
+          toast.success(`${p.name} added to shortlist`);
+          onHide(p.userId);
+          return;
+        case "ignore":
+          await addToIgnore({ ignoredUserId: p.userId }).unwrap();
+          toast.success(`${p.name} ignored`);
+          onHide(p.userId);
+          return;
+        case "chat":
+          router.push(action.url);
+          return;
+      }
+    } catch (err) {
+      const message =
+        (err as { data?: { message?: string } })?.data?.message ||
+        `Couldn't complete that action. Please try again.`;
+      toast.error(message);
+    }
   };
 
   return (
     <>
       <Link
-        href="/my-matches/details"
+        href={`/my-matches/details?id=${encodeURIComponent(p.id)}`}
         className="block overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:shadow-lg"
       >
         {/* Card */}
@@ -444,10 +546,15 @@ function ProfileCard({ p }: { p: Profile }) {
             <button
               key={action.label}
               type="button"
+              disabled={actionLoading[action.key]}
               onClick={(e) => handleAction(e, action)}
-              className="flex cursor-pointer items-center justify-center gap-2 py-3 text-xs font-semibold transition hover:bg-rose-100 sm:text-sm"
+              className="flex cursor-pointer items-center justify-center gap-2 py-3 text-xs font-semibold transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
             >
-              <action.icon size={16} />
+              {actionLoading[action.key] ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <action.icon size={16} />
+              )}
               <span>{action.label}</span>
             </button>
           ))}
@@ -471,10 +578,82 @@ function ProfileCard({ p }: { p: Profile }) {
 }
 
 const ProfilesCards = () => {
+  const searchParams = useSearchParams();
+  const [hiddenUserIds, setHiddenUserIds] = useState<Set<string>>(new Set());
+
+  const { data: myProfileData, isLoading: myProfileLoading } =
+    useGetMyProfileQuery();
+
+  const myGender = myProfileData?.data?.basicDetails?.gender;
+  const oppositeGender =
+    myGender === "Male" ? "Female" : myGender === "Female" ? "Male" : undefined;
+
+  const feedParams: ProfileFeedParams = useMemo(() => {
+    const params: ProfileFeedParams = {};
+    if (oppositeGender) params.gender = oppositeGender;
+
+    FILTER_PARAM_KEYS.forEach((key) => {
+      const value = searchParams.get(key);
+      if (value) params[key] = value;
+    });
+
+    return params;
+  }, [searchParams, oppositeGender]);
+
+  const {
+    data: feedData,
+    isLoading: feedLoading,
+    isError: feedError,
+  } = useGetProfileFeedQuery(feedParams, { skip: !oppositeGender });
+
+  const profiles = useMemo(
+    () =>
+      (feedData?.data ?? [])
+        .map(toCardProfile)
+        .filter((p) => !hiddenUserIds.has(p.userId)),
+    [feedData, hiddenUserIds],
+  );
+
+  const handleHide = (userId: string) => {
+    setHiddenUserIds((prev) => {
+      const next = new Set(prev);
+      next.add(userId);
+      return next;
+    });
+  };
+
+  const isLoading = myProfileLoading || feedLoading;
+
+  if (isLoading) {
+    return (
+      <div className="mt-5 flex items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white py-16 text-sm text-stone-500">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading profiles...
+      </div>
+    );
+  }
+
+  if (feedError) {
+    return (
+      <div className="mt-5 rounded-2xl border border-stone-200 bg-white py-16 text-center text-sm text-rose-500">
+        Unable to load profiles right now. Please try again.
+      </div>
+    );
+  }
+
+  if (profiles.length === 0) {
+    return (
+      <div className="mt-5 rounded-2xl border border-stone-200 bg-white py-16 text-center text-sm text-stone-400">
+        No profiles found matching your filters.
+      </div>
+    );
+  }
+
   return (
     <div className="mt-5 space-y-5">
-      {PROFILES.map((p) => (
-        <ProfileCard key={p.name} p={p} />
+      <Toaster position="top-center" reverseOrder={false} />
+      {profiles.map((p) => (
+        <ProfileCard key={p.id} p={p} onHide={handleHide} />
       ))}
     </div>
   );

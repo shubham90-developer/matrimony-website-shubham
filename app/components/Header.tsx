@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   Menu,
@@ -8,184 +8,108 @@ import {
   ChevronRight,
   Search as SearchIcon,
   Languages,
-  Users,
   Landmark,
-  Building2,
   Briefcase,
-  Map,
-  Plane,
+  Globe2,
   UserCircle,
   GraduationCap,
+  Wallet2,
+  Ruler,
+  Heart,
+  Moon,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Country } from "country-state-city";
 import ThemeBtnOne from "./ThemeBtnOne";
 import Logo from "./Logo";
 
-type BrowseCategory = {
-  key: string;
+import { useGetReligionsQuery } from "@/Redux/religionApi";
+import { useGetMotherTonguesQuery } from "@/Redux/motherToungeApi";
+import { useGetAnnualIncomesQuery } from "@/Redux/annualIncomeApi";
+import { useGetQualificationsQuery } from "@/Redux/qualificationApi";
+import { useGetOccupationsQuery } from "@/Redux/occupationApi";
+import { useGetHeightsQuery } from "@/Redux/heightApi";
+
+// ---------- Browse categories ----------
+// Labels/icons are UI-only. Options for religion, mother tongue, annual
+// income, education, occupation and height come live from the existing
+// Redux APIs. Country comes from the "country-state-city" package (same
+// source used in BasicDetails/Register). Marital status and manglik are
+// fixed enums — there's no admin lookup table for either anywhere in this
+// project (see Register.tsx's maritalOptions and KundaliDetails.tsx's
+// Manglik select), so the same fixed values are reused here for consistency.
+type BrowseCategoryKey =
+  | "religion"
+  | "motherTongue"
+  | "country"
+  | "annualIncome"
+  | "education"
+  | "occupation"
+  | "height"
+  | "maritalStatus"
+  | "manglik";
+
+type BrowseCategoryMeta = {
+  key: BrowseCategoryKey;
   label: string;
   icon: LucideIcon;
-  items: string[];
-  url?: string;
 };
 
-const BROWSE_CATEGORIES: BrowseCategory[] = [
-  {
-    key: "mother-tongue",
-    label: "Mother Tongue",
-    icon: Languages,
-    items: [
-      "Bihari",
-      "Bengali",
-      "Hindi Delhi",
-      "Hindi",
-      "Gujarati",
-      "Kannada",
-      "Malayalam",
-      "Marathi",
-      "Oriya",
-      "Punjabi",
-      "Rajasthani",
-      "Tamil",
-      "Telugu",
-      "Hindi UP",
-      "Hindi MP",
-      "Konkani",
-      "Himachali",
-      "Haryanvi",
-      "Assamese",
-      "Kashmiri",
-      "Sikkim Nepali",
-      "Tulu",
-    ],
-  },
-  {
-    key: "caste",
-    label: "Caste",
-    icon: Users,
-    items: [
-      "Brahmin",
-      "Rajput",
-      "Yadav",
-      "Kayastha",
-      "Kurmi",
-      "Jat",
-      "Maratha",
-      "Reddy",
-      "Nair",
-      "Naidu",
-      "Vishwakarma",
-      "Kamma",
-      "Agarwal",
-      "Jaiswal",
-      "Kshatriya",
-      "Iyer",
-    ],
-  },
-  {
-    key: "religion",
-    label: "Religion",
-    icon: Landmark,
-    items: [
-      "Hindu",
-      "Muslim",
-      "Sikh",
-      "Christian",
-      "Jain",
-      "Buddhist",
-      "Parsi",
-      "Inter-Religion",
-    ],
-  },
-  {
-    key: "city",
-    label: "City",
-    icon: Building2,
-    items: [
-      "Delhi",
-      "Mumbai",
-      "Bangalore",
-      "Pune",
-      "Hyderabad",
-      "Chennai",
-      "Kolkata",
-      "Ahmedabad",
-      "Jaipur",
-      "Lucknow",
-      "Chandigarh",
-      "Surat",
-    ],
-  },
-  {
-    key: "occupation",
-    label: "Occupation",
-    icon: Briefcase,
-    items: [
-      "Doctor",
-      "Engineer",
-      "CA / CS",
-      "Govt. Employee",
-      "Lawyer",
-      "Business",
-      "Teacher / Professor",
-      "Banking / Finance",
-      "IT Professional",
-      "Defence",
-      "Architect",
-      "Scientist",
-    ],
-  },
-  {
-    key: "state",
-    label: "State",
-    icon: Map,
-    items: [
-      "Uttar Pradesh",
-      "Maharashtra",
-      "Bihar",
-      "West Bengal",
-      "Rajasthan",
-      "Gujarat",
-      "Punjab",
-      "Karnataka",
-      "Tamil Nadu",
-      "Kerala",
-      "Haryana",
-      "Madhya Pradesh",
-    ],
-  },
-  {
-    key: "nri",
-    label: "NRI",
-    icon: Plane,
-    items: [
-      "USA",
-      "UK",
-      "Canada",
-      "Australia",
-      "UAE",
-      "Singapore",
-      "New Zealand",
-      "Germany",
-    ],
-  },
-  {
-    key: "college",
-    label: "College",
-    icon: GraduationCap,
-    items: [
-      "IIT",
-      "IIM",
-      "NIT",
-      "AIIMS",
-      "Delhi University",
-      "BITS Pilani",
-      "Anna University",
-      "Other",
-    ],
-  },
+const BROWSE_CATEGORY_META: BrowseCategoryMeta[] = [
+  { key: "religion", label: "Religion", icon: Landmark },
+  { key: "motherTongue", label: "Mother Tongue", icon: Languages },
+  { key: "country", label: "Country", icon: Globe2 },
+  { key: "annualIncome", label: "Annual Income", icon: Wallet2 },
+  { key: "education", label: "Education", icon: GraduationCap },
+  { key: "occupation", label: "Occupation", icon: Briefcase },
+  { key: "height", label: "Height", icon: Ruler },
+  { key: "maritalStatus", label: "Marital Status", icon: Heart },
+  { key: "manglik", label: "Manglik", icon: Moon },
 ];
+
+type BrowseItem = { id: string; label: string };
+
+type CategoryData = {
+  items: BrowseItem[];
+  isLoading: boolean;
+  isError: boolean;
+};
+
+// Same source used in BasicDetails.tsx / Register.tsx — computed once.
+const COUNTRY_OPTIONS: BrowseItem[] = Country.getAllCountries().map((c) => ({
+  id: c.isoCode,
+  label: c.name,
+}));
+
+// Same wording as Register.tsx's maritalOptions.
+const MARITAL_STATUS_OPTIONS: BrowseItem[] = [
+  { id: "Never Married", label: "Never Married" },
+  { id: "Divorced", label: "Divorced" },
+  { id: "Widowed", label: "Widowed" },
+  { id: "Awaiting Divorce", label: "Awaiting Divorce" },
+];
+
+// Same wording as KundaliDetails.tsx's Manglik select.
+const MANGLIK_OPTIONS: BrowseItem[] = [
+  { id: "Manglik", label: "Manglik" },
+  { id: "Non-Manglik", label: "Non-Manglik" },
+  { id: "partial-Manglik", label: "Partial-Manglik" },
+];
+
+const createEmptyFilters = (): Record<BrowseCategoryKey, string[]> => ({
+  religion: [],
+  motherTongue: [],
+  country: [],
+  annualIncome: [],
+  education: [],
+  occupation: [],
+  height: [],
+  maritalStatus: [],
+  manglik: [],
+});
 
 type SearchLink = {
   label: string;
@@ -214,18 +138,136 @@ const SEARCH_LINKS: SearchLink[] = [
 type DesktopMenu = "browse" | "search" | null;
 
 const Header = () => {
+  const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [openMenu, setOpenMenu] = useState<DesktopMenu>(null);
-  const [activeCategory, setActiveCategory] = useState<string>(
-    BROWSE_CATEGORIES[0].key,
+  const [activeCategory, setActiveCategory] = useState<BrowseCategoryKey>(
+    BROWSE_CATEGORY_META[0].key,
   );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileBrowseOpen, setMobileBrowseOpen] = useState(false);
-  const [mobileActiveCategory, setMobileActiveCategory] = useState<
-    string | null
-  >(null);
+  const [mobileActiveCategory, setMobileActiveCategory] =
+    useState<BrowseCategoryKey | null>(null);
+
+  const [selectedFilters, setSelectedFilters] =
+    useState<Record<BrowseCategoryKey, string[]>>(createEmptyFilters);
 
   const navRef = useRef<HTMLDivElement>(null);
+
+  const shouldFetchOptions = openMenu === "browse" || mobileBrowseOpen;
+
+  const {
+    data: religionData,
+    isLoading: religionLoading,
+    isError: religionErr,
+  } = useGetReligionsQuery(undefined, { skip: !shouldFetchOptions });
+  const {
+    data: motherTongueData,
+    isLoading: motherTongueLoading,
+    isError: motherTongueErr,
+  } = useGetMotherTonguesQuery(undefined, { skip: !shouldFetchOptions });
+  const {
+    data: annualIncomeData,
+    isLoading: annualIncomeLoading,
+    isError: annualIncomeErr,
+  } = useGetAnnualIncomesQuery(undefined, { skip: !shouldFetchOptions });
+  const {
+    data: qualificationData,
+    isLoading: qualificationLoading,
+    isError: qualificationErr,
+  } = useGetQualificationsQuery(undefined, { skip: !shouldFetchOptions });
+  const {
+    data: occupationData,
+    isLoading: occupationLoading,
+    isError: occupationErr,
+  } = useGetOccupationsQuery(undefined, { skip: !shouldFetchOptions });
+  const {
+    data: heightData,
+    isLoading: heightLoading,
+    isError: heightErr,
+  } = useGetHeightsQuery(undefined, { skip: !shouldFetchOptions });
+
+  const categoryData: Record<BrowseCategoryKey, CategoryData> = useMemo(
+    () => ({
+      religion: {
+        items: (religionData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.religion })),
+        isLoading: religionLoading,
+        isError: religionErr,
+      },
+      motherTongue: {
+        items: (motherTongueData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.motherTongue })),
+        isLoading: motherTongueLoading,
+        isError: motherTongueErr,
+      },
+      country: {
+        items: COUNTRY_OPTIONS,
+        isLoading: false,
+        isError: false,
+      },
+      annualIncome: {
+        items: (annualIncomeData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.annualIncome })),
+        isLoading: annualIncomeLoading,
+        isError: annualIncomeErr,
+      },
+      education: {
+        items: (qualificationData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.qualification })),
+        isLoading: qualificationLoading,
+        isError: qualificationErr,
+      },
+      occupation: {
+        items: (occupationData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.occupation })),
+        isLoading: occupationLoading,
+        isError: occupationErr,
+      },
+      height: {
+        items: (heightData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.height })),
+        isLoading: heightLoading,
+        isError: heightErr,
+      },
+      maritalStatus: {
+        items: MARITAL_STATUS_OPTIONS,
+        isLoading: false,
+        isError: false,
+      },
+      manglik: {
+        items: MANGLIK_OPTIONS,
+        isLoading: false,
+        isError: false,
+      },
+    }),
+    [
+      religionData,
+      religionLoading,
+      religionErr,
+      motherTongueData,
+      motherTongueLoading,
+      motherTongueErr,
+      annualIncomeData,
+      annualIncomeLoading,
+      annualIncomeErr,
+      qualificationData,
+      qualificationLoading,
+      qualificationErr,
+      occupationData,
+      occupationLoading,
+      occupationErr,
+      heightData,
+      heightLoading,
+      heightErr,
+    ],
+  );
 
   // Check login state on mount + keep in sync across tabs
   useEffect(() => {
@@ -272,9 +314,103 @@ const Header = () => {
     setOpenMenu((prev) => (prev === menu ? null : menu));
   };
 
-  const activeCategoryData =
-    BROWSE_CATEGORIES.find((c) => c.key === activeCategory) ??
-    BROWSE_CATEGORIES[0];
+  const toggleItem = (categoryKey: BrowseCategoryKey, itemId: string) => {
+    setSelectedFilters((prev) => {
+      const current = prev[categoryKey];
+      const next = current.includes(itemId)
+        ? current.filter((id) => id !== itemId)
+        : [...current, itemId];
+      return { ...prev, [categoryKey]: next };
+    });
+  };
+
+  const totalSelectedCount = useMemo(
+    () =>
+      (Object.values(selectedFilters) as string[][]).reduce(
+        (sum, arr) => sum + arr.length,
+        0,
+      ),
+    [selectedFilters],
+  );
+
+  const handleClearAll = () => {
+    setSelectedFilters(createEmptyFilters());
+  };
+
+  const handleApply = () => {
+    const params = new URLSearchParams();
+    (Object.keys(selectedFilters) as BrowseCategoryKey[]).forEach((key) => {
+      const values = selectedFilters[key];
+      if (values.length > 0) {
+        params.set(key, values.join(","));
+      }
+    });
+    const query = params.toString();
+    router.push(query ? `/my-matches/matches?${query}` : "/my-matches/matches");
+    setOpenMenu(null);
+    setMobileOpen(false);
+    setMobileBrowseOpen(false);
+  };
+
+  const activeCategoryMeta =
+    BROWSE_CATEGORY_META.find((c) => c.key === activeCategory) ??
+    BROWSE_CATEGORY_META[0];
+  const activeCategoryData = categoryData[activeCategoryMeta.key];
+
+  const renderPanelState = (data: CategoryData) => {
+    if (data.isLoading) {
+      return (
+        <div className="col-span-3 flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading options...
+        </div>
+      );
+    }
+    if (data.isError) {
+      return (
+        <div className="col-span-3 py-10 text-center text-sm text-rose-500">
+          Unable to load options right now.
+        </div>
+      );
+    }
+    if (data.items.length === 0) {
+      return (
+        <div className="col-span-3 py-10 text-center text-sm text-slate-400">
+          No options available.
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const FilterFooter = ({ className = "" }: { className?: string }) => (
+    <div
+      className={`flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-3 ${className}`}
+    >
+      <button
+        type="button"
+        onClick={handleClearAll}
+        disabled={totalSelectedCount === 0}
+        className="cursor-pointer text-[12px] font-semibold text-slate-500 transition-colors hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-slate-500"
+      >
+        Clear all
+      </button>
+      <div className="flex items-center gap-3">
+        {totalSelectedCount > 0 && (
+          <span className="text-[12px] text-slate-500">
+            {totalSelectedCount} selected
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={handleApply}
+          className="cursor-pointer rounded-full bg-rose-600 px-6 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-rose-700"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <header className="relative z-50 w-full border-b border-rose-100 bg-white shadow-xs">
@@ -309,9 +445,10 @@ const Header = () => {
                 <div className="flex">
                   {/* Category tabs */}
                   <div className="w-55 shrink-0 border-r-2 border-dashed border-rose-200 bg-slate-50/60 py-3">
-                    {BROWSE_CATEGORIES.map((cat) => {
+                    {BROWSE_CATEGORY_META.map((cat) => {
                       const Icon = cat.icon;
                       const isActive = activeCategory === cat.key;
+                      const count = selectedFilters[cat.key].length;
                       return (
                         <button
                           key={cat.key}
@@ -333,7 +470,14 @@ const Header = () => {
                           >
                             <Icon className="h-4 w-4" />
                           </span>
-                          <span className="flex-1">{cat.label}</span>
+                          <span className="flex-1">
+                            {cat.label}
+                            {count > 0 && (
+                              <span className="ml-1.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] text-rose-600">
+                                {count}
+                              </span>
+                            )}
+                          </span>
                           <ChevronRight className="h-4 w-4 shrink-0 opacity-60" />
                         </button>
                       );
@@ -345,28 +489,46 @@ const Header = () => {
                     <div className="flex flex-1">
                       {/* Item columns with dashed dividers */}
                       <div className="grid flex-1 grid-cols-3 divide-x divide-dashed divide-slate-200 p-6">
-                        {[0, 1, 2].map((col) => (
-                          <div
-                            key={col}
-                            className={`flex px-2 flex-col gap-4 ${col === 0 ? "pr-0" : "px-0"}`}
-                          >
-                            {activeCategoryData.items
-                              .filter((_, i) => i % 3 === col)
-                              .map((item) => (
-                                <Link
-                                  key={item}
-                                  href="/my-matches/matches"
-                                  className="text-[12px] font-medium text-black transition-colors hover:text-rose-600  border-b border-dashed border-slate-200 py-2"
-                                >
-                                  {item}
-                                </Link>
-                              ))}
-                          </div>
-                        ))}
+                        {renderPanelState(activeCategoryData) ??
+                          [0, 1, 2].map((col) => (
+                            <div
+                              key={col}
+                              className={`flex px-2 flex-col gap-4 ${col === 0 ? "pr-0" : "px-0"}`}
+                            >
+                              {activeCategoryData.items
+                                .filter((_, i) => i % 3 === col)
+                                .map((item) => (
+                                  <label
+                                    key={item.id}
+                                    className="flex cursor-pointer items-center gap-2 border-b border-dashed border-slate-200 py-2"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedFilters[
+                                        activeCategoryMeta.key
+                                      ].includes(item.id)}
+                                      onChange={() =>
+                                        toggleItem(
+                                          activeCategoryMeta.key,
+                                          item.id,
+                                        )
+                                      }
+                                      className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-rose-500 focus:ring-rose-300"
+                                    />
+                                    <span className="text-[12px] font-medium text-black transition-colors hover:text-rose-600">
+                                      {item.label}
+                                    </span>
+                                  </label>
+                                ))}
+                            </div>
+                          ))}
                       </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Clear / Apply */}
+                <FilterFooter />
               </div>
             )}
           </div>
@@ -511,9 +673,11 @@ const Header = () => {
 
                 {mobileBrowseOpen && (
                   <div className="pb-2">
-                    {BROWSE_CATEGORIES.map((cat) => {
+                    {BROWSE_CATEGORY_META.map((cat) => {
                       const isOpen = mobileActiveCategory === cat.key;
                       const Icon = cat.icon;
+                      const data = categoryData[cat.key];
+                      const count = selectedFilters[cat.key].length;
                       return (
                         <div key={cat.key} className="px-3">
                           <button
@@ -533,6 +697,11 @@ const Header = () => {
                             </span>
                             <span className="flex-1 text-left">
                               {cat.label}
+                              {count > 0 && (
+                                <span className="ml-1.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] text-rose-600">
+                                  {count}
+                                </span>
+                              )}
                             </span>
                             <ChevronRight
                               className={`h-4 w-4 shrink-0 transition-transform duration-200 ${
@@ -543,21 +712,52 @@ const Header = () => {
                             />
                           </button>
                           {isOpen && (
-                            <div className="mb-2 ml-2 grid grid-cols-2 gap-x-3 gap-y-2 rounded-lg bg-slate-50 p-3">
-                              {cat.items.map((item) => (
-                                <Link
-                                  key={item}
-                                  href="/my-matches/matches"
-                                  className="text-[12px] text-slate-600 hover:text-rose-600 py-2"
-                                >
-                                  {item}
-                                </Link>
-                              ))}
+                            <div className="mb-2 ml-2 rounded-lg bg-slate-50 p-3">
+                              {data.isLoading ? (
+                                <div className="flex items-center gap-2 py-3 text-[12px] text-slate-500">
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  Loading options...
+                                </div>
+                              ) : data.isError ? (
+                                <div className="py-3 text-[12px] text-rose-500">
+                                  Unable to load options.
+                                </div>
+                              ) : data.items.length === 0 ? (
+                                <div className="py-3 text-[12px] text-slate-400">
+                                  No options available.
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                                  {data.items.map((item) => (
+                                    <label
+                                      key={item.id}
+                                      className="flex cursor-pointer items-center gap-2 py-1 text-[12px] text-slate-600"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedFilters[
+                                          cat.key
+                                        ].includes(item.id)}
+                                        onChange={() =>
+                                          toggleItem(cat.key, item.id)
+                                        }
+                                        className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-rose-500 focus:ring-rose-300"
+                                      />
+                                      <span className="hover:text-rose-600">
+                                        {item.label}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
                       );
                     })}
+
+                    {/* Clear / Apply */}
+                    <FilterFooter className="mt-1 rounded-lg" />
                   </div>
                 )}
               </div>

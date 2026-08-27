@@ -10,6 +10,8 @@ import { casteApi } from "./casteApi";
 import { subCasteApi } from "./subCasteApi";
 import { motherTongueApi } from "./motherToungeApi";
 import { profileApi } from "./profileApi";
+import { shortlistApi } from "./shortlistApi";
+import { interestApi } from "./interestApi";
 
 export const store = configureStore({
   reducer: {
@@ -22,6 +24,8 @@ export const store = configureStore({
     [subCasteApi.reducerPath]: subCasteApi.reducer,
     [motherTongueApi.reducerPath]: motherTongueApi.reducer,
     [profileApi.reducerPath]: profileApi.reducer,
+    [shortlistApi.reducerPath]: shortlistApi.reducer,
+    [interestApi.reducerPath]: interestApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -34,6 +38,8 @@ export const store = configureStore({
       subCasteApi.middleware,
       motherTongueApi.middleware,
       profileApi.middleware,
+      shortlistApi.middleware,
+      interestApi.middleware,
     ),
 });
 

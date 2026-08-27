@@ -131,10 +131,6 @@ export interface AboutMe {
   hivStatus: boolean;
 }
 
-// ---------- Payload for POST /v1/api/profile ----------
-// Plain JSON — no photos, no subscription. Photos are uploaded separately
-// (POST /v1/api/profile/photos) AFTER this profile exists; subscription is
-// server-managed and only set once a package is purchased.
 export interface ProfilePayload {
   basicDetails: BasicDetails;
   educationDetails: EducationDetails;
@@ -175,14 +171,45 @@ export interface ProfileResponse {
   data: Profile;
 }
 
-// ---------- Base URL ----------
+export interface ProfileFeedParams {
+  matchPreference?: string;
+  gender?: string;
+  minAge?: number;
+  maxAge?: number;
+  [key: string]: string | number | undefined;
+}
+
+export interface ProfileFeedListResponse {
+  success: boolean;
+  count: number;
+  data: Profile[];
+}
+
+export interface RecommendedMatchesParams {
+  page?: number;
+  limit?: number;
+  [key: string]: string | number | undefined;
+}
+
+const buildQueryString = (
+  params?: Record<string, string | number | undefined>,
+) => {
+  if (!params) return "";
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    searchParams.set(key, String(value));
+  });
+  const qs = searchParams.toString();
+  return qs ? `?${qs}` : "";
+};
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 if (!API_BASE_URL) {
   throw new Error("NEXT_PUBLIC_API_BASE_URL is not defined in .env.local");
 }
 
-// ---------- API slice ----------
 export const profileApi = createApi({
   reducerPath: "profileApi",
 
@@ -197,7 +224,6 @@ export const profileApi = createApi({
     },
   }),
   endpoints: (builder) => ({
-    // STEP 1 — create the profile itself (plain JSON, no photos).
     addProfile: builder.mutation<ProfileResponse, ProfilePayload>({
       query: (body) => ({
         url: "/profile",
@@ -234,7 +260,6 @@ export const profileApi = createApi({
       invalidatesTags: ["Profile"],
     }),
 
-    // SOFT DELETE — PATCH /v1/api/profile.
     deleteProfile: builder.mutation<ProfileResponse, void>({
       query: () => ({
         url: "/profile",
@@ -251,6 +276,28 @@ export const profileApi = createApi({
       }),
       invalidatesTags: ["Profile"],
     }),
+
+    getProfileFeed: builder.query<
+      ProfileFeedListResponse,
+      ProfileFeedParams | void
+    >({
+      query: (params) => `/profile${buildQueryString(params ?? undefined)}`,
+      providesTags: ["Profile"],
+    }),
+
+    getRecommendedMatches: builder.query<
+      ProfileFeedListResponse,
+      RecommendedMatchesParams | void
+    >({
+      query: (params) =>
+        `/profile/recommended-matches${buildQueryString(params ?? undefined)}`,
+      providesTags: ["Profile"],
+    }),
+
+    getProfileById: builder.query<ProfileResponse, string>({
+      query: (id) => `/profile/${id}`,
+      providesTags: (result, error, id) => [{ type: "Profile", id }],
+    }),
   }),
 });
 
@@ -261,4 +308,7 @@ export const {
   useUploadProfilePhotosMutation,
   useGetMyProfileQuery,
   useRemoveProfilePhotoMutation,
+  useGetProfileFeedQuery,
+  useGetRecommendedMatchesQuery,
+  useGetProfileByIdQuery,
 } = profileApi;

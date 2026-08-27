@@ -24,9 +24,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${jura.className} bg-white`}>
       <body className="min-h-full flex flex-col">
-        <LayoutHeader />
-        <ReduxProvider>{children}</ReduxProvider>
-        <Footer />
+        <ReduxProvider>
+          <LayoutHeader />
+          {children}
+          <Footer />
+        </ReduxProvider>
       </body>
     </html>
   );
