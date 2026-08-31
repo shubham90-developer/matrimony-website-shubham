@@ -15,6 +15,7 @@ import {
   Home,
   Languages,
   Leaf,
+  Loader2,
   MapPin,
   MessageCircle,
   Moon,
@@ -33,48 +34,93 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import toast, { Toaster } from "react-hot-toast";
 import { PhotoSlider } from "./PhotoSlider";
+import {
+  useGetProfileByIdQuery,
+  type Profile as ApiProfile,
+} from "@/Redux/profileApi";
+import { useSendInterestMutation } from "@/Redux/interestApi";
+import { useAddToShortlistMutation } from "@/Redux/shortlistApi";
+import { useAddToIgnoreMutation } from "@/Redux/ignoreApi";
 
-/* ---------------- Mock data (swap for a real fetch later) ---------------- */
+/* ---------------- Map the API profile onto the flat shape this page renders ---------------- */
 
-const profile = {
-  name: "A Shinde",
-  age: 25,
-  id: "TKW***789",
-  lastSeen: "25-Jul-26",
-  tag: "Just Joined",
-  status: "Online",
-  managedBy: "Parent",
-  images: ["/img/matches/1.jpg", "/img/matches/2.jpg", "/img/matches/3.jpg"],
-  height: "5'4\"",
-  city: "Solapur, India",
-  religion: "Hindu",
-  caste: "Maratha Kunbi",
-  income: "Rs. 2 - 3 Lakh per Annum",
-  motherTongue: "Marathi",
-  marital: "Never Married",
-  about:
-    "I am A Shinde, a 25-year-old from Solapur, Maharashtra, with a Master's degree in Commerce. Currently seeking job opportunities, I am eager to build a meaningful life with a supportive partner who values family and personal growth.",
-  education: "M.Com - Post Graduation",
-  career: "Looking for job",
-  careerNote: "Not working currently",
-  familyHeadline:
-    "Father is a Businessman/Entrepreneur & Mother is a Homemaker",
-  siblings: "1 Brother (Married)",
-  familyAbout:
-    "My father is a farmer My mother is a homemaker My younger brother is in college",
-  livingSituation: "Living with parents",
-  dob: "30 May, 2001",
-  matchPercent: 9,
-  matchTotal: 9,
-  diet: "Veg",
-  drinking: "No",
-  smoking: "No",
-  fitness: "Yes",
-  sleep: "Yes",
-  manglik: "no",
-};
+interface DetailProfile {
+  userId: string;
+  name: string;
+  age: number;
+  id: string;
+  images: string[];
+  height: string;
+  city: string;
+  religion: string;
+  caste: string;
+  income: string;
+  motherTongue: string;
+  marital: string;
+  about: string;
+  education: string;
+  career: string;
+  careerNote: string;
+  familyHeadline: string;
+  siblings: string;
+  familyAbout: string;
+  livingSituation: string;
+  dob: string;
+  diet: string;
+  drinking: string;
+  smoking: string;
+  manglik: string;
+}
+
+const FALLBACK_IMAGE = "/img/matches/1.jpg";
+
+function toDetailProfile(p: ApiProfile): DetailProfile {
+  const siblings = [
+    p.family?.brothers && `${p.family.brothers} Brother(s)`,
+    p.family?.sisters && `${p.family.sisters} Sister(s)`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return {
+    userId: p._id,
+    name: `${p.basicDetails?.firstName ?? ""} ${p.basicDetails?.lastName ?? ""}`.trim(),
+    age: p.basicDetails?.age ?? 0,
+    id: p.matrimonyId || p._id,
+    images: p.photos && p.photos.length > 0 ? p.photos : [FALLBACK_IMAGE],
+    height: p.basicDetails?.height ?? "",
+    city: [p.locationDetails?.city, p.locationDetails?.state]
+      .filter(Boolean)
+      .join(", "),
+    religion: p.religionDetails?.religion ?? "",
+    caste: [p.religionDetails?.caste, p.religionDetails?.subCaste]
+      .filter(Boolean)
+      .join(" • "),
+    income: p.educationDetails?.annualIncome ?? "",
+    motherTongue: p.religionDetails?.motherTongue ?? "",
+    marital: p.basicDetails?.maritalStatus ?? "",
+    about: p.aboutMe?.about ?? "",
+    education:
+      p.education?.highestDegree ||
+      p.educationDetails?.highestQualification ||
+      "",
+    career: p.careerDetails?.occupation || p.educationDetails?.occupation || "",
+    careerNote: p.careerDetails?.organizationName ?? "",
+    familyHeadline: p.family?.aboutFamily ?? "",
+    siblings,
+    familyAbout: p.family?.aboutFamily ?? "",
+    livingSituation: p.family?.livingWithParents ? "Living with parents" : "",
+    dob: p.basicDetails?.dob ?? "",
+    diet: p.lifestyle?.dietaryHabit ?? "",
+    drinking: p.lifestyle?.drinkingHabit ?? "",
+    smoking: p.lifestyle?.smokingHabit ?? "",
+    manglik: p.religionDetails?.hasDosh ? "Manglik" : "Non-Manglik",
+  };
+}
 
 const TABS = ["About Me", "Family", "Looking For"] as const;
 type Tab = (typeof TABS)[number];
@@ -104,7 +150,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 /* ---------------- Tab content ---------------- */
 
-function AboutMeTab() {
+function AboutMeTab({ profile }: { profile: DetailProfile }) {
   return (
     <div className="space-y-8">
       <p className="text-sm leading-relaxed text-stone-600">{profile.about}</p>
@@ -136,13 +182,15 @@ function AboutMeTab() {
       <div className="space-y-3">
         <SectionTitle>Career</SectionTitle>
         <InfoRow icon={Briefcase}>{profile.career}</InfoRow>
-        <p className="pl-5.75 text-xs text-black">{profile.careerNote}</p>
+        {profile.careerNote && (
+          <p className="pl-5.75 text-xs text-black">{profile.careerNote}</p>
+        )}
       </div>
     </div>
   );
 }
 
-function FamilyTab() {
+function FamilyTab({ profile }: { profile: DetailProfile }) {
   return (
     <div className="space-y-8">
       <div className="space-y-3">
@@ -158,9 +206,11 @@ function FamilyTab() {
         </p>
       </div>
 
-      <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
-        {profile.livingSituation}
-      </span>
+      {profile.livingSituation && (
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
+          {profile.livingSituation}
+        </span>
+      )}
 
       <div className="space-y-3">
         <SectionTitle>Kundli and Astro</SectionTitle>
@@ -171,8 +221,13 @@ function FamilyTab() {
   );
 }
 
-function LookingForTab() {
-  const pct = Math.round((profile.matchPercent / profile.matchTotal) * 100);
+// No partner-preference/match-score API exists yet — kept as a fixed
+// display until that endpoint is available, rather than faking a number.
+const MATCH_PERCENT = 9;
+const MATCH_TOTAL = 9;
+
+function LookingForTab({ profile }: { profile: DetailProfile }) {
+  const pct = Math.round((MATCH_PERCENT / MATCH_TOTAL) * 100);
 
   return (
     <div className="space-y-4">
@@ -208,8 +263,7 @@ function LookingForTab() {
               />
             </div>
             <p className="mt-1 text-xs font-semibold text-stone-500">
-              You match {profile.matchPercent}/{profile.matchTotal} of her
-              preference
+              You match {MATCH_PERCENT}/{MATCH_TOTAL} of her preference
             </p>
           </div>
 
@@ -230,32 +284,12 @@ function LookingForTab() {
 
 /* ---------------- Page ---------------- */
 
-const actions = [
-  {
-    icon: Heart,
-    label: "Interest",
-    href: "/my-profile",
-    variant: "active",
-  },
-  {
-    icon: Star,
-    label: "Shortlist",
-    href: "/my-matches/shortlist",
-  },
-  {
-    icon: MessageCircle,
-    label: "Chat",
-    href: "/my-matches/chat",
-  },
-  {
-    icon: Crown,
-    label: "Upgrade",
-    href: "/membership",
-    variant: "gold",
-  },
-];
+type ActionVariant = "active" | "gold" | undefined;
 
 const MyMatchesDetails = () => {
+  const searchParams = useSearchParams();
+  const profileId = searchParams.get("id");
+
   const [activeTab, setActiveTab] = useState<Tab>("About Me");
   const [openMenu, setOpenMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -270,8 +304,126 @@ const MyMatchesDetails = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const {
+    data: profileData,
+    isLoading: profileLoading,
+    isError: profileError,
+  } = useGetProfileByIdQuery(profileId ?? "", { skip: !profileId });
+
+  const profile = useMemo(
+    () => (profileData?.data ? toDetailProfile(profileData.data) : null),
+    [profileData],
+  );
+
+  const [sendInterest, { isLoading: sendingInterest }] =
+    useSendInterestMutation();
+  const [addToShortlist, { isLoading: shortlisting }] =
+    useAddToShortlistMutation();
+  const [addToIgnore, { isLoading: blocking }] = useAddToIgnoreMutation();
+
+  const handleInterest = async () => {
+    if (!profile) return;
+    try {
+      await sendInterest({ receiverId: profile.userId }).unwrap();
+      toast.success("Interest sent!");
+    } catch (err) {
+      const message =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Couldn't send interest. Please try again.";
+      toast.error(message);
+    }
+  };
+
+  const handleShortlist = async () => {
+    if (!profile) return;
+    try {
+      await addToShortlist({ shortlistedUserId: profile.userId }).unwrap();
+      toast.success("Added to shortlist!");
+    } catch (err) {
+      const message =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Couldn't shortlist. Please try again.";
+      toast.error(message);
+    }
+  };
+
+  const handleBlock = async () => {
+    if (!profile) return;
+    try {
+      await addToIgnore({ ignoredUserId: profile.userId }).unwrap();
+      toast.success("Profile blocked.");
+      setOpenMenu(false);
+    } catch (err) {
+      const message =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Couldn't block profile. Please try again.";
+      toast.error(message);
+    }
+  };
+
+  const actions: {
+    icon: React.ElementType;
+    label: string;
+    href?: string;
+    onClick?: () => void;
+    loading?: boolean;
+    variant?: ActionVariant;
+  }[] = [
+    {
+      icon: Heart,
+      label: "Interest",
+      onClick: handleInterest,
+      loading: sendingInterest,
+      variant: "active",
+    },
+    {
+      icon: Star,
+      label: "Shortlist",
+      onClick: handleShortlist,
+      loading: shortlisting,
+    },
+    {
+      icon: MessageCircle,
+      label: "Chat",
+      href: "/my-matches/messenger",
+    },
+    {
+      icon: Crown,
+      label: "Upgrade",
+      href: "/membership",
+      variant: "gold",
+    },
+  ];
+
+  if (!profileId) {
+    return (
+      <div className="flex items-center justify-center rounded-xl border border-gray-200 py-20 text-sm text-stone-500">
+        No profile selected.
+      </div>
+    );
+  }
+
+  if (profileLoading) {
+    return (
+      <div className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-20 text-sm text-stone-500">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading profile...
+      </div>
+    );
+  }
+
+  if (profileError || !profile) {
+    return (
+      <div className="flex items-center justify-center rounded-xl border border-gray-200 py-20 text-sm text-rose-500">
+        Profile not found.
+      </div>
+    );
+  }
+
   return (
     <section>
+      <Toaster position="top-center" reverseOrder={false} />
       <div className="border border-gray-200 p-4 rounded-xl">
         <Link
           href="/my-matches/matches"
@@ -284,27 +436,6 @@ const MyMatchesDetails = () => {
         <div className="relative h-105 sm:h-125 lg:h-155 w-full overflow-hidden rounded-2xl bg-linear-to-b from-slate-700 to-slate-900">
           <PhotoSlider images={profile.images} name={profile.name} />
 
-          <div className="absolute left-4 top-4 z-10 flex flex-wrap items-center gap-2">
-            {profile.tag && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/90 backdrop-blur-sm border border-stone-200 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-                <Send size={12} className="text-orange-500" />
-                {profile.tag}
-              </span>
-            )}
-
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${
-                profile.status === "Online"
-                  ? "bg-emerald-500 text-white"
-                  : "bg-slate-100 text-slate-600 border border-slate-200"
-              }`}
-            >
-              {profile.status === "Online" && (
-                <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-              )}
-              {profile.status}
-            </span>
-          </div>
           <div className="absolute right-3 top-3 z-20" ref={menuRef}>
             <button
               type="button"
@@ -317,8 +448,17 @@ const MyMatchesDetails = () => {
 
             {openMenu && (
               <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-                <button className="flex border-b border-dashed border-gray-200 cursor-pointer w-full items-center gap-3 px-4 py-3 text-sm hover:bg-slate-100">
-                  <Blocks size={16} className="text-pink-500" />
+                <button
+                  type="button"
+                  disabled={blocking}
+                  onClick={handleBlock}
+                  className="flex border-b border-dashed border-gray-200 cursor-pointer w-full items-center gap-3 px-4 py-3 text-sm hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {blocking ? (
+                    <Loader2 size={16} className="animate-spin text-pink-500" />
+                  ) : (
+                    <Blocks size={16} className="text-pink-500" />
+                  )}
                   Block Profile
                 </button>
 
@@ -334,10 +474,6 @@ const MyMatchesDetails = () => {
               </div>
             )}
           </div>
-
-          <div className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-semibold text-white">
-            Last seen on {profile.lastSeen}
-          </div>
         </div>
 
         {/* Name row */}
@@ -350,12 +486,6 @@ const MyMatchesDetails = () => {
           </div>
           <p className="mt-1 text-sm font-bold text-rose-500 ">
             ID - {profile.id}
-          </p>
-          <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-cyan-100 px-3 py-1.5 text-sm font-medium text-cyan-800 shadow-sm">
-            <UserRound size={16} />
-            <span>
-              Profile managed by <strong>{profile.managedBy}</strong>
-            </span>
           </p>
         </div>
 
@@ -414,16 +544,16 @@ const MyMatchesDetails = () => {
               {
                 icon: Dumbbell,
                 label: "Fitness",
-                value: profile.fitness,
-                fallback: "Regular",
+                value: "",
+                fallback: "Not specified",
                 iconBg: "bg-emerald-50",
                 iconColor: "text-emerald-600",
               },
               {
                 icon: Moon,
                 label: "Sleep Schedule",
-                value: profile.sleep,
-                fallback: "Normal",
+                value: "",
+                fallback: "Not specified",
                 iconBg: "bg-indigo-50",
                 iconColor: "text-indigo-600",
               },
@@ -479,48 +609,76 @@ const MyMatchesDetails = () => {
 
         {/* Tab content */}
         <div className="pt-6">
-          {activeTab === "About Me" && <AboutMeTab />}
-          {activeTab === "Family" && <FamilyTab />}
-          {activeTab === "Looking For" && <LookingForTab />}
+          {activeTab === "About Me" && <AboutMeTab profile={profile} />}
+          {activeTab === "Family" && <FamilyTab profile={profile} />}
+          {activeTab === "Looking For" && <LookingForTab profile={profile} />}
         </div>
 
         <div className="sticky top-20 mt-15 rounded-3xl bg-rose-100 px-6 py-6">
           <div className="flex items-start justify-around">
-            {actions.map(({ icon: Icon, label, href, variant }) => (
-              <Link
-                key={label}
-                href={href}
-                className="flex flex-col items-center gap-2 group"
-              >
-                <span
-                  className={`flex h-13 w-13 items-center justify-center rounded-full transition-all duration-300 group-hover:scale-105 ${
-                    variant === "active"
-                      ? "bg-rose-800 shadow-[0_0_0_3px_rgba(190,50,90,0.2)]"
-                      : "border border-neutral-700 bg-neutral-800"
-                  }`}
-                >
-                  <Icon
-                    className={`h-5 w-5 ${
-                      variant === "active"
-                        ? "text-white"
-                        : variant === "gold"
-                          ? "text-amber-400"
-                          : "text-neutral-300"
-                    }`}
-                  />
-                </span>
+            {actions.map(
+              ({ icon: Icon, label, href, onClick, loading, variant }) => {
+                const content = (
+                  <>
+                    <span
+                      className={`flex h-13 w-13 items-center justify-center rounded-full transition-all duration-300 group-hover:scale-105 ${
+                        variant === "active"
+                          ? "bg-rose-800 shadow-[0_0_0_3px_rgba(190,50,90,0.2)]"
+                          : "border border-neutral-700 bg-neutral-800"
+                      } ${loading ? "opacity-60" : ""}`}
+                    >
+                      {loading ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-white" />
+                      ) : (
+                        <Icon
+                          className={`h-5 w-5 ${
+                            variant === "active"
+                              ? "text-white"
+                              : variant === "gold"
+                                ? "text-amber-400"
+                                : "text-neutral-300"
+                          }`}
+                        />
+                      )}
+                    </span>
 
-                <span
-                  className={`text-xs font-medium transition-colors ${
-                    variant === "active"
-                      ? "text-rose-800"
-                      : "text-neutral-600 group-hover:text-neutral-900"
-                  }`}
-                >
-                  {label}
-                </span>
-              </Link>
-            ))}
+                    <span
+                      className={`text-xs font-medium transition-colors ${
+                        variant === "active"
+                          ? "text-rose-800"
+                          : "text-neutral-600 group-hover:text-neutral-900"
+                      }`}
+                    >
+                      {label}
+                    </span>
+                  </>
+                );
+
+                if (href) {
+                  return (
+                    <Link
+                      key={label}
+                      href={href}
+                      className="flex flex-col items-center gap-2 group"
+                    >
+                      {content}
+                    </Link>
+                  );
+                }
+
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    disabled={loading}
+                    onClick={onClick}
+                    className="flex cursor-pointer flex-col items-center gap-2 group disabled:cursor-not-allowed"
+                  >
+                    {content}
+                  </button>
+                );
+              },
+            )}
           </div>
         </div>
       </div>

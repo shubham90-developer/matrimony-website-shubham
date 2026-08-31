@@ -1,78 +1,266 @@
 "use client";
 
-import { useState } from "react";
-import { SlidersHorizontal, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  SlidersHorizontal,
+  X,
+  Loader2,
+  Landmark,
+  Languages,
+  Globe2,
+  Wallet2,
+  GraduationCap,
+  Briefcase,
+  Ruler,
+  Heart,
+  Moon,
+  type LucideIcon,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Country } from "country-state-city";
 import ThemeBtnOne from "@/app/components/ThemeBtnOne";
 
-const FILTERS = [
-  { label: "Filters", icon: SlidersHorizontal },
-  { label: "Metro Cities" },
-  { label: "From Pune/ Chinchwad" },
-  { label: "Self Profiles" },
-  { label: "Verified" },
-  { label: "Paid Profiles" },
+import { useGetReligionsQuery } from "@/Redux/religionApi";
+import { useGetMotherTonguesQuery } from "@/Redux/motherToungeApi";
+import { useGetAnnualIncomesQuery } from "@/Redux/annualIncomeApi";
+import { useGetQualificationsQuery } from "@/Redux/qualificationApi";
+import { useGetOccupationsQuery } from "@/Redux/occupationApi";
+import { useGetHeightsQuery } from "@/Redux/heightApi";
+
+type BrowseCategoryKey =
+  | "religion"
+  | "motherTongue"
+  | "country"
+  | "annualIncome"
+  | "education"
+  | "occupation"
+  | "height"
+  | "maritalStatus"
+  | "manglik";
+
+type BrowseCategoryMeta = {
+  key: BrowseCategoryKey;
+  label: string;
+  icon: LucideIcon;
+};
+
+const BROWSE_CATEGORY_META: BrowseCategoryMeta[] = [
+  { key: "religion", label: "Religion", icon: Landmark },
+  { key: "motherTongue", label: "Mother Tongue", icon: Languages },
+  { key: "country", label: "Country", icon: Globe2 },
+  { key: "annualIncome", label: "Annual Income", icon: Wallet2 },
+  { key: "education", label: "Education", icon: GraduationCap },
+  { key: "occupation", label: "Occupation", icon: Briefcase },
+  { key: "height", label: "Height", icon: Ruler },
+  { key: "maritalStatus", label: "Marital Status", icon: Heart },
+  { key: "manglik", label: "Manglik", icon: Moon },
 ];
 
-const CATEGORIES = [
-  {
-    key: "smart",
-    label: "Smart Filters",
-    options: [
-      { key: "online", label: "Online", count: 11 },
-      { key: "viewed", label: "Viewed", count: 986 },
-      { key: "active_today", label: "Active Today", count: 13 },
-      { key: "nearby", label: "Nearby", count: 572 },
-      { key: "verified", label: "Verified", count: 33 },
-      { key: "paid", label: "Paid Profiles", count: 220 },
-      { key: "just_joined", label: "Just Joined", count: 119 },
-      { key: "self", label: "Self Profiles", count: 1478 },
-      { key: "with_photos", label: "With Photos", count: 1575 },
-    ],
-  },
-  { key: "family_based_out_of", label: "Family based out of", options: [] },
-  { key: "profile_posted_by", label: "Profile posted by", options: [] },
-  { key: "activity_on_site", label: "Activity on site", options: [] },
-  { key: "religion", label: "Religion", options: [] },
-  { key: "mother_tongue", label: "Mother Tongue", options: [] },
-  { key: "caste_group", label: "Caste Group", options: [] },
-  { key: "caste_subcaste", label: "Caste Subcaste", options: [] },
-  { key: "country", label: "Country", options: [] },
-  { key: "city", label: "City", options: [] },
-  { key: "income", label: "Income", options: [] },
+type BrowseItem = { id: string; label: string };
+
+type CategoryData = {
+  items: BrowseItem[];
+  isLoading: boolean;
+  isError: boolean;
+};
+
+// Same source used in BasicDetails.tsx / Register.tsx / Header.tsx.
+const COUNTRY_OPTIONS: BrowseItem[] = Country.getAllCountries().map((c) => ({
+  id: c.isoCode,
+  label: c.name,
+}));
+
+// Same wording as Register.tsx's maritalOptions.
+const MARITAL_STATUS_OPTIONS: BrowseItem[] = [
+  { id: "Never Married", label: "Never Married" },
+  { id: "Divorced", label: "Divorced" },
+  { id: "Widowed", label: "Widowed" },
+  { id: "Awaiting Divorce", label: "Awaiting Divorce" },
 ];
+
+// Same wording as KundaliDetails.tsx's Manglik select.
+const MANGLIK_OPTIONS: BrowseItem[] = [
+  { id: "Manglik", label: "Manglik" },
+  { id: "Non-Manglik", label: "Non-Manglik" },
+  { id: "partial-Manglik", label: "Partial-Manglik" },
+];
+
+const createEmptyFilters = (): Record<BrowseCategoryKey, string[]> => ({
+  religion: [],
+  motherTongue: [],
+  country: [],
+  annualIncome: [],
+  education: [],
+  occupation: [],
+  height: [],
+  maritalStatus: [],
+  manglik: [],
+});
 
 function RefineMatchesSheet({
   open,
   onClose,
-  onShowMatches,
 }: {
   open: boolean;
   onClose: () => void;
-  onShowMatches: (selected: Record<string, string[]>) => void;
 }) {
-  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0].key);
-  const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const router = useRouter();
 
-  const activeOptions =
-    CATEGORIES.find((c) => c.key === activeCategory)?.options ?? [];
-  const activeSelected = selected[activeCategory] ?? [];
-  const isAllSelected = activeSelected.length === 0;
+  const [activeCategory, setActiveCategory] = useState<BrowseCategoryKey>(
+    BROWSE_CATEGORY_META[0].key,
+  );
+  const [selected, setSelected] =
+    useState<Record<BrowseCategoryKey, string[]>>(createEmptyFilters);
 
-  const toggleOption = (optionKey: string) => {
+  // Only hit the network while the sheet is actually open.
+  const {
+    data: religionData,
+    isLoading: religionLoading,
+    isError: religionErr,
+  } = useGetReligionsQuery(undefined, { skip: !open });
+  const {
+    data: motherTongueData,
+    isLoading: motherTongueLoading,
+    isError: motherTongueErr,
+  } = useGetMotherTonguesQuery(undefined, { skip: !open });
+  const {
+    data: annualIncomeData,
+    isLoading: annualIncomeLoading,
+    isError: annualIncomeErr,
+  } = useGetAnnualIncomesQuery(undefined, { skip: !open });
+  const {
+    data: qualificationData,
+    isLoading: qualificationLoading,
+    isError: qualificationErr,
+  } = useGetQualificationsQuery(undefined, { skip: !open });
+  const {
+    data: occupationData,
+    isLoading: occupationLoading,
+    isError: occupationErr,
+  } = useGetOccupationsQuery(undefined, { skip: !open });
+  const {
+    data: heightData,
+    isLoading: heightLoading,
+    isError: heightErr,
+  } = useGetHeightsQuery(undefined, { skip: !open });
+
+  const categoryData: Record<BrowseCategoryKey, CategoryData> = useMemo(
+    () => ({
+      religion: {
+        items: (religionData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.religion })),
+        isLoading: religionLoading,
+        isError: religionErr,
+      },
+      motherTongue: {
+        items: (motherTongueData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.motherTongue })),
+        isLoading: motherTongueLoading,
+        isError: motherTongueErr,
+      },
+      country: {
+        items: COUNTRY_OPTIONS,
+        isLoading: false,
+        isError: false,
+      },
+      annualIncome: {
+        items: (annualIncomeData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.annualIncome })),
+        isLoading: annualIncomeLoading,
+        isError: annualIncomeErr,
+      },
+      education: {
+        items: (qualificationData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.qualification })),
+        isLoading: qualificationLoading,
+        isError: qualificationErr,
+      },
+      occupation: {
+        items: (occupationData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.occupation })),
+        isLoading: occupationLoading,
+        isError: occupationErr,
+      },
+      height: {
+        items: (heightData?.data ?? [])
+          .filter((d) => !d.isDeleted)
+          .map((d) => ({ id: d._id, label: d.height })),
+        isLoading: heightLoading,
+        isError: heightErr,
+      },
+      maritalStatus: {
+        items: MARITAL_STATUS_OPTIONS,
+        isLoading: false,
+        isError: false,
+      },
+      manglik: {
+        items: MANGLIK_OPTIONS,
+        isLoading: false,
+        isError: false,
+      },
+    }),
+    [
+      religionData,
+      religionLoading,
+      religionErr,
+      motherTongueData,
+      motherTongueLoading,
+      motherTongueErr,
+      annualIncomeData,
+      annualIncomeLoading,
+      annualIncomeErr,
+      qualificationData,
+      qualificationLoading,
+      qualificationErr,
+      occupationData,
+      occupationLoading,
+      occupationErr,
+      heightData,
+      heightLoading,
+      heightErr,
+    ],
+  );
+
+  const activeMeta =
+    BROWSE_CATEGORY_META.find((c) => c.key === activeCategory) ??
+    BROWSE_CATEGORY_META[0];
+  const activeData = categoryData[activeMeta.key];
+
+  const totalSelected = (Object.values(selected) as string[][]).reduce(
+    (sum, arr) => sum + arr.length,
+    0,
+  );
+
+  const toggleOption = (optionId: string) => {
     setSelected((prev) => {
       const current = prev[activeCategory] ?? [];
-      const next = current.includes(optionKey)
-        ? current.filter((k) => k !== optionKey)
-        : [...current, optionKey];
+      const next = current.includes(optionId)
+        ? current.filter((id) => id !== optionId)
+        : [...current, optionId];
       return { ...prev, [activeCategory]: next };
     });
   };
 
-  const selectAll = () => {
-    setSelected((prev) => ({ ...prev, [activeCategory]: [] }));
-  };
+  const handleReset = () => setSelected(createEmptyFilters());
 
-  const handleReset = () => setSelected({});
+  // Same query-param keys FILTER_PARAM_KEYS in ProfilesCards.tsx reads,
+  // and the same target page Header's mega menu applies to — so this
+  // sheet drives the exact same feed filtering as the home page filter.
+  const handleShowMatches = () => {
+    const params = new URLSearchParams();
+    (Object.keys(selected) as BrowseCategoryKey[]).forEach((key) => {
+      const values = selected[key];
+      if (values.length > 0) params.set(key, values.join(","));
+    });
+    const query = params.toString();
+    router.push(query ? `/my-matches/matches?${query}` : "/my-matches/matches");
+    onClose();
+  };
 
   if (!open) return null;
 
@@ -95,7 +283,8 @@ function RefineMatchesSheet({
             <button
               type="button"
               onClick={handleReset}
-              className="rounded-full cursor-pointer border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-600 transition-all duration-200 hover:bg-rose-100 hover:border-rose-300"
+              disabled={totalSelected === 0}
+              className="rounded-full cursor-pointer border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-600 transition-all duration-200 hover:bg-rose-100 hover:border-rose-300 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Reset
             </button>
@@ -115,75 +304,65 @@ function RefineMatchesSheet({
         <div className="flex flex-1 overflow-hidden">
           {/* Category list */}
           <div className="w-50 shrink-0 overflow-y-auto border-r border-stone-200 bg-stone-50">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.key}
-                onClick={() => setActiveCategory(cat.key)}
-                className={`w-full border-b cursor-pointer border-stone-200 border-r-[3px] px-3.5 py-3 text-left text-[13px] font-semibold transition ${
-                  activeCategory === cat.key
-                    ? "border-r-rose-600 bg-white text-slate-900"
-                    : "border-r-transparent text-stone-500 hover:bg-white hover:text-stone-700"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
+            {BROWSE_CATEGORY_META.map((cat) => {
+              const Icon = cat.icon;
+              const count = selected[cat.key].length;
+              const isActive = activeCategory === cat.key;
+              return (
+                <button
+                  key={cat.key}
+                  type="button"
+                  onClick={() => setActiveCategory(cat.key)}
+                  className={`flex w-full items-center gap-2.5 border-b cursor-pointer border-stone-200 border-r-[3px] px-3.5 py-3 text-left text-[13px] font-semibold transition ${
+                    isActive
+                      ? "border-r-rose-600 bg-white text-slate-900"
+                      : "border-r-transparent text-stone-500 hover:bg-white hover:text-stone-700"
+                  }`}
+                >
+                  <Icon size={15} className="shrink-0" />
+                  <span className="flex-1">{cat.label}</span>
+                  {count > 0 && (
+                    <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] text-rose-600">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Options */}
           <div className="flex-1 overflow-y-auto px-4 py-3">
-            {activeOptions.length === 0 ? (
+            {activeData.isLoading ? (
+              <div className="flex items-center justify-center gap-2 py-10 text-sm text-stone-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading options...
+              </div>
+            ) : activeData.isError ? (
+              <p className="pt-8 text-center text-sm text-rose-500">
+                Unable to load options right now.
+              </p>
+            ) : activeData.items.length === 0 ? (
               <p className="pt-8 text-center text-sm text-stone-400">
-                No filters in this category yet
+                No options available.
               </p>
             ) : (
               <div className="space-y-1">
-                <label
-                  onClick={selectAll}
-                  className="flex cursor-pointer items-center gap-2.5 py-2"
-                >
-                  <span
-                    className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded ${
-                      isAllSelected
-                        ? "bg-rose-600"
-                        : "border-[1.5px] border-stone-300"
-                    }`}
-                  >
-                    {isAllSelected && <CheckIcon />}
-                  </span>
-
-                  <span className="text-sm font-medium text-slate-900">
-                    All
-                  </span>
-                </label>
-
-                {activeOptions.map((opt) => {
-                  const checked = activeSelected.includes(opt.key);
-
+                {activeData.items.map((opt) => {
+                  const checked = selected[activeCategory].includes(opt.id);
                   return (
                     <label
-                      key={opt.key}
-                      onClick={() => toggleOption(opt.key)}
-                      className="flex cursor-pointer items-center justify-between rounded-lg px-1 py-2 transition hover:bg-stone-50"
+                      key={opt.id}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-2 transition hover:bg-stone-50"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <span
-                          className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded ${
-                            checked
-                              ? "bg-rose-600"
-                              : "border-[1.5px] border-stone-300"
-                          }`}
-                        >
-                          {checked && <CheckIcon />}
-                        </span>
-
-                        <span className="text-sm text-stone-600">
-                          {opt.label}
-                        </span>
-                      </div>
-
-                      <span className="text-xs text-stone-400">
-                        ({opt.count})
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleOption(opt.id)}
+                        className="h-4 w-4 shrink-0 rounded border-stone-300 text-rose-500 focus:ring-rose-300"
+                      />
+                      <span className="text-sm text-stone-600">
+                        {opt.label}
                       </span>
                     </label>
                   );
@@ -196,28 +375,17 @@ function RefineMatchesSheet({
         {/* Footer */}
         <div className="border-t border-stone-100 px-5 py-4">
           <ThemeBtnOne
-            onClick={() => onShowMatches(selected)}
-            text=" Show Matches"
+            onClick={handleShowMatches}
+            text={
+              totalSelected > 0
+                ? `Show Matches (${totalSelected})`
+                : "Show Matches"
+            }
             className="w-full cursor-pointer rounded-xl bg-rose-600 py-3.5 text-sm font-semibold text-white transition hover:bg-rose-700"
           />
         </div>
       </div>
     </div>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="white"
-      strokeWidth={3}
-    >
-      <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
 
@@ -227,24 +395,18 @@ const TopFilters = () => {
   return (
     <>
       <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
-        {FILTERS.map(({ label, icon: Icon }) => (
-          <button
-            key={label}
-            onClick={() => label === "Filters" && setSheetOpen(true)}
-            className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-rose-300"
-          >
-            {Icon && <Icon size={15} />} {label}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-rose-300"
+        >
+          <SlidersHorizontal size={15} /> Filters
+        </button>
       </div>
 
       <RefineMatchesSheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        onShowMatches={(selected) => {
-          console.log("apply filters", selected);
-          setSheetOpen(false);
-        }}
       />
     </>
   );
