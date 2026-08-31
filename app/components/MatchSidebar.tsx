@@ -4,6 +4,9 @@ import { ChevronRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useGetMyProfileQuery } from "@/Redux/profileApi";
+
+const FALLBACK_IMAGE = "/img/profile/1.jpg";
 
 const SIDEBAR = [
   { label: "Matches", url: "/my-matches/matches" },
@@ -15,21 +18,29 @@ const SIDEBAR = [
 
 export default function MatchSidebar() {
   const pathname = usePathname();
+  const { data } = useGetMyProfileQuery();
+
+  const profile = data?.data;
+  const firstName = profile?.basicDetails?.firstName || "there";
+  const matrimonyId = profile?.matrimonyId || "";
+  const avatar = profile?.photos?.[0] || FALLBACK_IMAGE;
 
   return (
     <aside className="hidden h-fit rounded-2xl border border-stone-200 bg-white p-5 md:block">
       <div className="flex items-center gap-3">
         <Image
-          src="/img/profile/1.jpg"
-          alt="Suraj"
+          src={avatar}
+          alt={firstName}
           width={56}
           height={56}
           className="h-14 w-14 rounded-full object-cover"
         />
 
         <div>
-          <h2 className="font-serif font-bold text-slate-900">Hi Suraj!</h2>
-          <p className="text-sm text-black">UXZZ5861</p>
+          <h2 className="font-serif font-bold text-slate-900">
+            Hi {firstName}!
+          </h2>
+          {matrimonyId && <p className="text-sm text-black">{matrimonyId}</p>}
         </div>
       </div>
 

@@ -42,8 +42,16 @@ import {
   useGetProfileByIdQuery,
   type Profile as ApiProfile,
 } from "@/Redux/profileApi";
-import { useSendInterestMutation } from "@/Redux/interestApi";
-import { useAddToShortlistMutation } from "@/Redux/shortlistApi";
+import {
+  useSendInterestMutation,
+  useGetSentInterestsQuery,
+  useWithdrawInterestMutation,
+} from "@/Redux/interestApi";
+import {
+  useAddToShortlistMutation,
+  useGetMyShortlistQuery,
+  useRemoveFromShortlistMutation,
+} from "@/Redux/shortlistApi";
 import { useAddToIgnoreMutation } from "@/Redux/ignoreApi";
 
 /* ---------------- Map the API profile onto the flat shape this page renders ---------------- */
@@ -316,21 +324,53 @@ const MyMatchesDetails = () => {
     [profileData],
   );
 
+  const { data: sentInterestsData, isFetching: sentInterestsFetching } =
+    useGetSentInterestsQuery();
+  const { data: shortlistData, isFetching: shortlistFetching } =
+    useGetMyShortlistQuery();
+
+  const interestEntry = useMemo(
+    () =>
+      sentInterestsData?.data.find(
+        (i) =>
+          i.receiverId?._id === profile?.userId && i.status !== "Withdrawn",
+      ),
+    [sentInterestsData, profile],
+  );
+
+  const shortlistEntry = useMemo(
+    () =>
+      shortlistData?.data.find((s) => s.shortlistedUserId === profile?.userId),
+    [shortlistData, profile],
+  );
+
+  const isInterested = !!interestEntry;
+  const isShortlisted = !!shortlistEntry;
+
   const [sendInterest, { isLoading: sendingInterest }] =
     useSendInterestMutation();
+  const [withdrawInterest, { isLoading: withdrawingInterest }] =
+    useWithdrawInterestMutation();
   const [addToShortlist, { isLoading: shortlisting }] =
     useAddToShortlistMutation();
+  const [removeFromShortlist, { isLoading: removingShortlist }] =
+    useRemoveFromShortlistMutation();
   const [addToIgnore, { isLoading: blocking }] = useAddToIgnoreMutation();
 
   const handleInterest = async () => {
     if (!profile) return;
     try {
-      await sendInterest({ receiverId: profile.userId }).unwrap();
-      toast.success("Interest sent!");
+      if (isInterested && interestEntry) {
+        await withdrawInterest(interestEntry._id).unwrap();
+        toast.success("Interest withdrawn");
+      } else {
+        await sendInterest({ receiverId: profile.userId }).unwrap();
+        toast.success("Interest sent!");
+      }
     } catch (err) {
       const message =
         (err as { data?: { message?: string } })?.data?.message ||
-        "Couldn't send interest. Please try again.";
+        "Couldn't complete that action. Please try again.";
       toast.error(message);
     }
   };
@@ -338,12 +378,17 @@ const MyMatchesDetails = () => {
   const handleShortlist = async () => {
     if (!profile) return;
     try {
-      await addToShortlist({ shortlistedUserId: profile.userId }).unwrap();
-      toast.success("Added to shortlist!");
+      if (isShortlisted && shortlistEntry) {
+        await removeFromShortlist(shortlistEntry._id).unwrap();
+        toast.success("Removed from shortlist");
+      } else {
+        await addToShortlist({ shortlistedUserId: profile.userId }).unwrap();
+        toast.success("Added to shortlist!");
+      }
     } catch (err) {
       const message =
         (err as { data?: { message?: string } })?.data?.message ||
-        "Couldn't shortlist. Please try again.";
+        "Couldn't complete that action. Please try again.";
       toast.error(message);
     }
   };
@@ -372,16 +417,16 @@ const MyMatchesDetails = () => {
   }[] = [
     {
       icon: Heart,
-      label: "Interest",
+      label: isInterested ? "Withdraw" : "Interest",
       onClick: handleInterest,
-      loading: sendingInterest,
-      variant: "active",
+      loading: sendingInterest || withdrawingInterest || sentInterestsFetching,
+      variant: isInterested ? undefined : "active",
     },
     {
       icon: Star,
-      label: "Shortlist",
+      label: isShortlisted ? "Shortlisted" : "Shortlist",
       onClick: handleShortlist,
-      loading: shortlisting,
+      loading: shortlisting || removingShortlist || shortlistFetching,
     },
     {
       icon: MessageCircle,
