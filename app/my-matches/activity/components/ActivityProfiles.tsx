@@ -6,10 +6,21 @@ import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import {
+  useGetSentInterestsQuery,
+  useGetReceivedInterestsQuery,
+  useAcceptInterestMutation,
+  useRejectInterestMutation,
+  useWithdrawInterestMutation,
+  type InterestEntry,
+} from "@/Redux/interestApi";
+import type { Profile as ApiProfile } from "@/Redux/profileApi";
 
 type Status = "accepted" | "received" | "visitor" | "sent";
 
-interface Profile {
+// Renamed to CardProfile to avoid clashing with the real `Profile` type from profileApi.ts
+interface CardProfile {
   id: string;
   name: string;
   age: number;
@@ -25,93 +36,39 @@ const STATUS_CONFIG: Record<Status, { label: string; badgeClass: string }> = {
   sent: { label: "Pending", badgeClass: "bg-amber-500/90" },
 };
 
-const ACCEPTED: Profile[] = [
-  {
-    id: "a1",
-    name: "Kalpita",
-    age: 28,
-    location: "Pune",
-    image: "/img/matches/1.jpg",
-  },
-  {
-    id: "a2",
-    name: "Divya",
-    age: 25,
-    location: "Mumbai",
-    image: "/img/matches/1.jpg",
-  },
-  {
-    id: "a3",
-    name: "Purva",
-    age: 28,
-    location: "Nagpur",
-    image: "/img/matches/1.jpg",
-  },
-  {
-    id: "a4",
-    name: "Aishwarya",
-    age: 27,
-    location: "Solapur",
-    image: "/img/matches/1.jpg",
-  },
-];
+// No /profile/visitors endpoint exists yet in the backend — keep empty
+// until that API is available.
+const VISITORS: CardProfile[] = [];
 
-const RECEIVED: Profile[] = [
-  {
-    id: "r1",
-    name: "Rohan",
-    age: 30,
-    location: "Pune",
-    image: "/img/matches/1.jpg",
-    meta: "Yesterday",
-  },
-  {
-    id: "r2",
-    name: "Amit",
-    age: 29,
-    location: "Nashik",
-    image: "/img/matches/1.jpg",
-    meta: "2 days ago",
-  },
-];
+// ---------- Helpers: map API data -> CardProfile shape the UI expects ----------
+function timeAgo(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks} week${weeks > 1 ? "s" : ""} ago`;
+}
 
-const VISITORS: Profile[] = [
-  {
-    id: "v1",
-    name: "Sneha",
-    age: 26,
-    location: "Pune",
-    image: "/img/matches/1.jpg",
-    meta: "Today",
-  },
-  {
-    id: "v2",
-    name: "Priya",
-    age: 27,
-    location: "Thane",
-    image: "/img/matches/1.jpg",
-    meta: "3 days ago",
-  },
-  {
-    id: "v3",
-    name: "Neha",
-    age: 25,
-    location: "Kolhapur",
-    image: "/img/matches/1.jpg",
-    meta: "1 week ago",
-  },
-];
-
-const SENT: Profile[] = [
-  {
-    id: "s1",
-    name: "Varun",
-    age: 31,
-    location: "Pune",
-    image: "/img/matches/1.jpg",
-    meta: "Sent 3 days ago",
-  },
-];
+function toCardProfile(
+  entry: InterestEntry,
+  other: ApiProfile | undefined,
+  metaPrefix?: string,
+): CardProfile {
+  return {
+    id: entry._id,
+    name: other
+      ? `${other.basicDetails.firstName} ${other.basicDetails.lastName}`
+      : "Unknown",
+    age: other?.basicDetails.age ?? 0,
+    location: other?.locationDetails.city ?? "",
+    image: other?.photos?.[0] || "/img/matches/1.jpg",
+    meta: metaPrefix
+      ? `${metaPrefix} ${timeAgo(entry.createdAt)}`
+      : timeAgo(entry.createdAt),
+  };
+}
 
 function NextArrow({ onClick }: { onClick?: () => void }) {
   return (
@@ -139,11 +96,12 @@ const SLIDER_SETTINGS = {
   infinite: false,
   speed: 300,
   slidesToShow: 5,
-  slidesToScroll: 2,
+  slidesToScroll: 1,
   nextArrow: <NextArrow />,
   prevArrow: <PrevArrow />,
   responsive: [
-    { breakpoint: 1024, settings: { slidesToShow: 3.3 } },
+    { breakpoint: 1280, settings: { slidesToShow: 4, slidesToScroll: 1 } },
+    { breakpoint: 1024, settings: { slidesToShow: 3, slidesToScroll: 1 } },
     { breakpoint: 640, settings: { slidesToShow: 1, arrows: false } },
   ],
 };
@@ -154,7 +112,7 @@ function ProfileCard({
   onPrimaryAction,
   onSecondaryAction,
 }: {
-  profile: Profile;
+  profile: CardProfile;
   status: Status;
   onPrimaryAction?: (id: string) => void;
   onSecondaryAction?: (id: string) => void;
@@ -246,7 +204,7 @@ function ActivitySection({
   onSecondaryAction,
 }: {
   title: string;
-  profiles: Profile[];
+  profiles: CardProfile[];
   status: Status;
   onPrimaryAction?: (id: string) => void;
   onSecondaryAction?: (id: string) => void;
@@ -289,24 +247,60 @@ function ActivitySection({
 }
 
 export default function ActivityProfiles() {
-  const handleChat = (id: string) => console.log("open chat with", id);
-  const handleCancel = (id: string) => console.log("cancel acceptance", id);
-  const handleAccept = (id: string) => console.log("accept interest from", id);
-  const handleDecline = (id: string) =>
-    console.log("decline interest from", id);
+  const router = useRouter();
+
+  const { data: sentData } = useGetSentInterestsQuery();
+  const { data: receivedData } = useGetReceivedInterestsQuery();
+
+  const [acceptInterest] = useAcceptInterestMutation();
+  const [rejectInterest] = useRejectInterestMutation();
+  const [withdrawInterest] = useWithdrawInterestMutation();
+
+  const sent = sentData?.data ?? [];
+  const received = receivedData?.data ?? [];
+
+  const acceptedEntries = received.filter((i) => i.status === "Accepted");
+  const pendingReceivedEntries = received.filter((i) => i.status === "Pending");
+  const pendingSentEntries = sent.filter((i) => i.status === "Pending");
+
+  const acceptedProfiles: CardProfile[] = acceptedEntries.map((e) =>
+    toCardProfile(e, e.senderId),
+  );
+  const receivedProfiles: CardProfile[] = pendingReceivedEntries.map((e) =>
+    toCardProfile(e, e.senderId),
+  );
+  const sentProfiles: CardProfile[] = pendingSentEntries.map((e) =>
+    toCardProfile(e, e.receiverId, "Sent"),
+  );
+
+  const handleChat = (interestId: string) => {
+    router.push(`/my-matches/details?interestId=${interestId}`);
+  };
+
+  const handleCancel = (interestId: string) => {
+    withdrawInterest(interestId);
+  };
+
+  const handleAccept = (interestId: string) => {
+    acceptInterest(interestId);
+  };
+
+  const handleDecline = (interestId: string) => {
+    rejectInterest(interestId);
+  };
 
   return (
     <div className="space-y-8 border p-3 border-gray-200">
       <ActivitySection
         title="Accepted Profiles"
-        profiles={ACCEPTED}
+        profiles={acceptedProfiles}
         status="accepted"
         onPrimaryAction={handleChat}
         onSecondaryAction={handleCancel}
       />
       <ActivitySection
         title="Interests Received"
-        profiles={RECEIVED}
+        profiles={receivedProfiles}
         status="received"
         onPrimaryAction={handleAccept}
         onSecondaryAction={handleDecline}
@@ -316,7 +310,11 @@ export default function ActivityProfiles() {
         profiles={VISITORS}
         status="visitor"
       />
-      <ActivitySection title="Interests Sent" profiles={SENT} status="sent" />
+      <ActivitySection
+        title="Interests Sent"
+        profiles={sentProfiles}
+        status="sent"
+      />
     </div>
   );
 }

@@ -1,20 +1,17 @@
 // interestApi.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { Profile } from "./profileApi";
-
+import { baseQueryWithReauth } from "./baseQueryWithReauth";
 export interface SendInterestRequest {
   receiverId: string;
 }
 
-export type InterestStatus = "pending" | "accepted" | "rejected" | "withdrawn";
-
+export type InterestStatus = "Pending" | "Accepted" | "Rejected" | "Withdrawn";
 export interface InterestEntry {
   _id: string;
-  senderId: string;
-  receiverId: string;
+  senderId: Profile;
+  receiverId: Profile;
   status: InterestStatus;
-  sender?: Profile;
-  receiver?: Profile;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,23 +27,10 @@ export interface InterestEntryResponse {
   data: InterestEntry;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-if (!API_BASE_URL) {
-  throw new Error("NEXT_PUBLIC_API_BASE_URL is not defined in .env.local");
-}
-
 export const interestApi = createApi({
   reducerPath: "interestApi",
   tagTypes: ["Interest"],
-  baseQuery: fetchBaseQuery({
-    baseUrl: API_BASE_URL,
-    prepareHeaders: (headers) => {
-      const token = localStorage.getItem("accessToken");
-      if (token) headers.set("Authorization", `Bearer ${token}`);
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
     sendInterest: builder.mutation<InterestEntryResponse, SendInterestRequest>({
       query: (body) => ({

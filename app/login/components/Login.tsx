@@ -5,11 +5,9 @@ import { ChevronLeft, ChevronDown, Search, Check } from "lucide-react";
 import Link from "next/link";
 import ThemeBtnOne from "@/app/components/ThemeBtnOne";
 import { useRouter } from "next/navigation";
-import {
-  useSendOtpMutation,
-  useVerifyOtpMutation,
-  useResendOtpMutation,
-} from "@/Redux/authApi";
+import { signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
+import { getRecaptchaVerifier, auth } from "@/app/config/firebase";
+import { useVerifyOtpMutation } from "@/Redux/authApi";
 
 import countriesData from "world-countries";
 
@@ -35,13 +33,15 @@ const FALLBACK_COUNTRIES: Country[] = countriesData
 const DEFAULT_COUNTRY: Country =
   FALLBACK_COUNTRIES.find((c) => c.code === "IN") ?? FALLBACK_COUNTRIES[0];
 
-const OTP_LENGTH = 4;
+const OTP_LENGTH = 6; // Firebase phone auth OTPs are 6 digits
 const RESEND_SECONDS = 29;
 
 const Login = () => {
-  const [sendOtp, { isLoading: sendingOtp }] = useSendOtpMutation();
   const [verifyOtp, { isLoading: verifyingOtp }] = useVerifyOtpMutation();
-  const [resendOtpApi, { isLoading: resendingOtp }] = useResendOtpMutation();
+
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [resendingOtp, setResendingOtp] = useState(false);
+
   const [otpError, setOtpError] = useState("");
   const [phoneError, setPhoneError] = useState("");
 
@@ -51,6 +51,10 @@ const Login = () => {
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(""));
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  // Holds the Firebase confirmation handle returned after sending the OTP.
+  // Needed later to confirm the OTP the user types in.
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
 
   const [countries] = useState<Country[]>(FALLBACK_COUNTRIES);
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
@@ -124,57 +128,92 @@ const Login = () => {
     otpRefs.current[Math.min(pasted.length, OTP_LENGTH - 1)]?.focus();
   };
 
+  // Sends the OTP via Firebase Phone Auth (backend is not involved here).
   const handleGetOtp = async () => {
     if (phone.length !== 10) return;
     setPhoneError("");
+    setSendingOtp(true);
     try {
-      await sendOtp({ countryCode: country.dialCode, mobile: phone }).unwrap();
+      const verifier = getRecaptchaVerifier("recaptcha-container");
+      const fullPhone = `${country.dialCode}${phone}`;
+
+      const result = await signInWithPhoneNumber(auth, fullPhone, verifier);
+      confirmationResultRef.current = result;
+
       setOtp(Array(OTP_LENGTH).fill(""));
       setStep("otp");
-    } catch {
+    } catch (err) {
+      console.error(err);
       setPhoneError("Failed to send OTP. Please try again.");
+    } finally {
+      setSendingOtp(false);
     }
   };
 
+  // Confirms the OTP with Firebase, gets the Firebase ID token, then
+  // sends that token to our backend to get our own access/refresh tokens.
   const handleVerifyOtp = async () => {
     if (otp.some((d) => !d)) return;
+    if (!confirmationResultRef.current) {
+      setOtpError("Session expired. Please request a new OTP.");
+      setStep("phone");
+      return;
+    }
     setOtpError("");
     try {
+      const credential = await confirmationResultRef.current.confirm(
+        otp.join(""),
+      );
+      const idToken = await credential.user.getIdToken();
+
       const res = await verifyOtp({
         mobile: phone,
-        otp: otp.join(""),
+        countryCode: country.dialCode,
+        token: idToken,
       }).unwrap();
+
       localStorage.setItem("accessToken", res.accessToken);
       localStorage.setItem("refreshToken", res.refreshToken);
+
       if (res.isNewUser) {
         router.push("/register");
       } else {
         setStep("success");
       }
-      setStep("success");
-    } catch {
+    } catch (err) {
+      console.error(err);
       setOtpError("Invalid OTP. Please try again.");
     }
   };
 
+  // Resend just re-triggers Firebase's sendOtp flow again.
   const resendOtp = async () => {
     if (seconds > 0) return;
     setOtpError("");
+    setResendingOtp(true);
     try {
-      await resendOtpApi({
-        countryCode: country.dialCode,
-        mobile: phone,
-      }).unwrap();
+      const verifier = getRecaptchaVerifier("recaptcha-container");
+      const fullPhone = `${country.dialCode}${phone}`;
+
+      const result = await signInWithPhoneNumber(auth, fullPhone, verifier);
+      confirmationResultRef.current = result;
+
       setSeconds(RESEND_SECONDS);
       setOtp(Array(OTP_LENGTH).fill(""));
       otpRefs.current[0]?.focus();
-    } catch {
+    } catch (err) {
+      console.error(err);
       setOtpError("Failed to resend OTP. Please try again.");
+    } finally {
+      setResendingOtp(false);
     }
   };
 
   return (
     <div className="w-full bg-[#FDF8F3] py-12 px-5 sm:px-8 lg:px-8">
+      {/* Invisible reCAPTCHA required by Firebase Phone Auth */}
+      <div id="recaptcha-container"></div>
+
       <div className="mx-auto max-w-3xl  bg-white p-8 py-15">
         {step !== "success" && (
           <Link

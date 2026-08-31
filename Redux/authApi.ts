@@ -1,5 +1,6 @@
 // authApi.ts
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { baseQueryWithReauth } from "./baseQueryWithReauth";
 
 // ---------- Types ----------
 export interface SendOtpRequest {
@@ -7,9 +8,15 @@ export interface SendOtpRequest {
   mobile: string;
 }
 
+// Matches Swagger: POST /v1/api/auth/verify-otp expects
+// { mobile, countryCode, token }
+// "mobile" is the raw 10-digit number, e.g. "9876543210"
+// "countryCode" is e.g. "+91"
+// "token" is the Firebase ID token from confirmationResult.confirm(otp)
 export interface VerifyOtpRequest {
   mobile: string;
-  otp: string;
+  countryCode: string;
+  token: string;
 }
 
 export interface ResendOtpRequest {
@@ -35,14 +42,13 @@ export interface AuthUser {
   [key: string]: unknown;
 }
 
-// Flat response shape — backend returns tokens directly, no "data" wrapper
+// Matches Swagger 200 response shape exactly — no firebaseToken field
 export interface VerifyOtpResponse {
   success: boolean;
   message: string;
   isNewUser: boolean;
   accessToken: string;
   refreshToken: string;
-  firebaseToken: string;
   user: AuthUser;
 }
 
@@ -59,24 +65,12 @@ export interface ApiResponse<T> {
   data: T;
 }
 
-// ---------- Base URL ----------
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-if (!API_BASE_URL) {
-  throw new Error("NEXT_PUBLIC_API_BASE_URL is not defined in .env.local");
-}
-
 // ---------- API slice ----------
 export const authApi = createApi({
   reducerPath: "authApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: API_BASE_URL,
-    prepareHeaders: (headers) => {
-      const token = localStorage.getItem("accessToken");
-      if (token) headers.set("Authorization", `Bearer ${token}`);
-      return headers;
-    },
-  }),
+
+  baseQuery: baseQueryWithReauth,
+
   endpoints: (builder) => ({
     sendOtp: builder.mutation<ApiResponse<null>, SendOtpRequest>({
       query: (body) => ({
@@ -86,6 +80,7 @@ export const authApi = createApi({
       }),
     }),
 
+    // Verifies the Firebase ID token on the backend (Swagger: verify-otp)
     verifyOtp: builder.mutation<VerifyOtpResponse, VerifyOtpRequest>({
       query: (body) => ({
         url: "/auth/verify-otp",

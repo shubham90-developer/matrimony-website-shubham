@@ -13,6 +13,7 @@ import { profileApi } from "./profileApi";
 import { shortlistApi } from "./shortlistApi";
 import { interestApi } from "./interestApi";
 import { ignoreApi } from "./ignoreApi";
+import { authApi } from "./authApi";
 
 export const store = configureStore({
   reducer: {
@@ -28,6 +29,7 @@ export const store = configureStore({
     [shortlistApi.reducerPath]: shortlistApi.reducer,
     [interestApi.reducerPath]: interestApi.reducer,
     [ignoreApi.reducerPath]: ignoreApi.reducer,
+    [authApi.reducerPath]: authApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -43,6 +45,7 @@ export const store = configureStore({
       shortlistApi.middleware,
       interestApi.middleware,
       ignoreApi.middleware,
+      authApi.middleware,
     ),
 });
 
