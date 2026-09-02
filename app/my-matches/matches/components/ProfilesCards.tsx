@@ -92,7 +92,7 @@ const toCardProfile = (apiProfile: ApiProfile): Profile => {
     : false;
 
   return {
-    id: matrimonyId || _id,
+    id: _id,
     userId: _id,
     name: `${basicDetails?.firstName ?? ""} ${basicDetails?.lastName ?? ""}`.trim(),
     age: basicDetails?.age ?? 0,
