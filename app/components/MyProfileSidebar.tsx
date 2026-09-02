@@ -36,51 +36,64 @@ export default function MyProfileSidebar() {
       : FALLBACK_IMAGE;
 
   return (
-    <aside className="hidden h-fit rounded-2xl border border-stone-200 bg-white p-5 md:block">
-      <div className="flex items-center gap-3">
+    <aside className="h-fit rounded-2xl border border-stone-200 bg-white p-3.5 xs:p-4 md:p-5">
+      {/* Profile summary */}
+      <div className="flex items-center gap-2.5 xs:gap-3">
         <Image
           src={photoSrc}
           alt={firstName ?? "Profile"}
           width={56}
           height={56}
-          className="h-14 w-14 rounded-full object-cover"
+          className="h-11 w-11 shrink-0 rounded-full object-cover xs:h-12 xs:w-12 md:h-14 md:w-14"
         />
 
-        <div>
+        <div className="min-w-0">
           {isLoading ? (
             <>
-              <div className="h-4 w-24 animate-pulse rounded bg-stone-100" />
+              <div className="h-3.5 w-24 animate-pulse rounded bg-stone-100 xs:h-4" />
               <div className="mt-2 h-3 w-16 animate-pulse rounded bg-stone-100" />
             </>
           ) : (
             <>
-              <h2 className="font-serif font-bold text-slate-900">
+              <h2 className="truncate font-serif text-sm font-bold text-slate-900 xs:text-base">
                 {greeting}
               </h2>
-              <p className="text-sm text-black">{matrimonyId}</p>
+              <p className="truncate text-xs text-black xs:text-sm">
+                {matrimonyId}
+              </p>
             </>
           )}
         </div>
       </div>
 
-      <nav className="mt-4 border-t border-stone-100 pt-2">
-        {SIDEBAR.map((item) => (
-          <Link
-            key={item.label}
-            href={item.url}
-            className={`flex w-full items-center justify-between border-b border-dashed border-gray-200 px-3 py-3 transition ${
-              pathname === item.url
-                ? "bg-rose-50 text-rose-600"
-                : "text-stone-500 hover:bg-rose-50"
-            }`}
-          >
-            <span className="flex items-center gap-2 font-semibold">
-              {item.label}
-            </span>
-
-            <ChevronRight size={16} />
-          </Link>
-        ))}
+      {/* Nav: horizontal scroll on mobile/tablet, vertical stack on desktop */}
+      <nav
+        className="
+          mt-3.5 flex gap-2 overflow-x-auto border-t border-stone-100 pt-3
+          [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+          xs:mt-4 xs:pt-3.5
+          md:mt-4 md:flex-col md:gap-0 md:overflow-visible md:pt-2
+        "
+      >
+        {SIDEBAR.map((item) => {
+          const isActive = pathname === item.url;
+          return (
+            <Link
+              key={item.label}
+              href={item.url}
+              className={`flex shrink-0 items-center justify-between gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold transition xs:text-sm
+                md:w-full md:shrink md:rounded-none md:border-b md:border-dashed md:border-gray-200 md:px-3 md:py-3 md:text-sm
+                ${
+                  isActive
+                    ? "bg-rose-50 text-rose-600"
+                    : "bg-stone-50 text-stone-500 hover:bg-rose-50 md:bg-transparent"
+                }`}
+            >
+              <span>{item.label}</span>
+              <ChevronRight size={16} className="hidden md:block" />
+            </Link>
+          );
+        })}
       </nav>
     </aside>
   );

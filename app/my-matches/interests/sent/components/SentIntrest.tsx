@@ -117,54 +117,63 @@ function ProfileCard({
   const { label, badgeClass } = STATUS_CONFIG[status];
   const { primary } = STATUS_ACTIONS[status];
 
+  const handlePrimary = (e: React.MouseEvent) => {
+    // keep the button from triggering the parent <Link> navigation
+    e.preventDefault();
+    e.stopPropagation();
+    onPrimaryAction?.(profile.id);
+  };
+
   return (
-    <div className="px-1.5">
-      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white transition hover:shadow-md">
-        <Link href="/my-matches/details">
-          <div className="relative aspect-3/4 cursor-pointer">
-            <Image
-              src={profile.image}
-              alt={profile.name}
-              fill
-              className="h-full w-full object-cover"
-            />
+    <Link
+      href="/my-matches/details"
+      className="group relative block aspect-3/4 w-full overflow-hidden rounded-2xl border border-stone-200/70 bg-stone-900 shadow-[0_1px_2px_rgba(60,40,30,0.06),0_14px_28px_-18px_rgba(60,40,30,0.4)] transition-shadow duration-300 hover:shadow-[0_1px_2px_rgba(60,40,30,0.08),0_22px_38px_-18px_rgba(60,40,30,0.5)]"
+    >
+      {/* Photo fills the entire card as the background */}
+      <Image
+        src={profile.image}
+        alt={profile.name}
+        fill
+        sizes="(max-width: 480px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+        className="absolute inset-0 z-0 object-cover transition duration-500 group-hover:scale-105"
+      />
 
-            <span
-              className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${badgeClass}`}
-            >
-              {label}
-            </span>
-          </div>
+      {/* Scrim: subtle at top so the badge stays legible, strong at bottom for text */}
+      <div className="pointer-events-none absolute inset-0 z-10 bg-linear-to-t from-black/85 via-black/25 to-black/0" />
 
-          <div className="p-2.5 pb-3">
-            <p className="truncate text-sm font-semibold text-slate-900">
-              {profile.name}, {profile.age}
-            </p>
+      {/* Status badge, top-left */}
+      <span
+        className={`absolute left-1.5 top-1.5 z-20 rounded-full px-2 py-0.5 text-[9px] font-semibold text-white xs:left-2 xs:top-2 xs:px-2.5 xs:py-1 xs:text-[10px] ${badgeClass}`}
+      >
+        {label}
+      </span>
 
-            <p className="mt-1 flex items-center gap-1 truncate text-xs text-stone-500">
-              <MapPin size={11} />
-              {profile.location}
-            </p>
+      {/* Bottom overlaid info + action button */}
+      <div className="absolute inset-x-0 bottom-0 z-20 p-2 xs:p-2.5 sm:p-3">
+        <p className="truncate text-xs font-semibold text-white xs:text-sm">
+          {profile.name}, {profile.age}
+        </p>
 
-            {profile.meta && (
-              <p className="mt-1 truncate text-[11px] text-stone-400">
-                {profile.meta}
-              </p>
-            )}
-          </div>
-        </Link>
+        <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-white/80 xs:text-xs">
+          <MapPin size={10} className="shrink-0 xs:size-[11px]" />
+          <span className="truncate">{profile.location}</span>
+        </p>
 
-        <div className="border-t border-stone-100 p-2.5">
-          <button
-            type="button"
-            onClick={() => onPrimaryAction?.(profile.id)}
-            className="w-full rounded-lg bg-stone-100 py-2 text-xs font-semibold text-stone-700 transition hover:bg-stone-200"
-          >
-            {primary}
-          </button>
-        </div>
+        {profile.meta && (
+          <p className="mt-0.5 truncate text-[9px] text-white/60 xs:text-[11px]">
+            {profile.meta}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={handlePrimary}
+          className="relative z-30 mt-2 w-full cursor-pointer rounded-lg bg-white/15 py-1.5 text-[10px] font-semibold text-white backdrop-blur transition hover:bg-white/25 xs:mt-2.5 xs:py-2 xs:text-xs"
+        >
+          {primary}
+        </button>
       </div>
-    </div>
+    </Link>
   );
 }
 

@@ -55,8 +55,8 @@ const VerifyDetails = () => {
 
         {/* Button */}
         <ThemeBtnOne
-          text="Upgrade now"
-          url="/membership"
+          text="Verify now"
+          url="/my-profile/verify/profile-verify"
           className="mt-10 w-full rounded-full bg-rose-500 py-4 text-lg font-semibold text-white hover:bg-rose-600 cursor-pointer font-serif"
         />
 

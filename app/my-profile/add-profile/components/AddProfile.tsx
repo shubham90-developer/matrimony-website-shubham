@@ -101,16 +101,25 @@ const AddProfile = () => {
   return (
     <div className="rounded-xl border border-gray-200 p-4">
       <div className="relative mb-4 flex items-center justify-center border-b border-dashed border-gray-200 py-3">
+        {/* Back Button */}
         <Link
           href="/my-profile"
-          className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-100"
-          aria-label="Go back"
+          className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
+          aria-label="Go back to my profile"
         >
-          <ChevronLeft size={20} />
+          <ChevronLeft size={20} strokeWidth={2} />
         </Link>
-        <h3 className="font-serif text-xl font-semibold text-slate-900">
-          Add Photos
-        </h3>
+
+        {/* Title */}
+        <div className="text-center">
+          <h3 className="font-serif text-xl font-semibold leading-tight text-slate-900">
+            My Photos
+          </h3>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Capture and cherish your beautiful moments
+          </p>
+        </div>
       </div>
 
       <input
@@ -180,10 +189,20 @@ const AddProfile = () => {
         {totalCount < MAX_PHOTOS && (
           <button
             onClick={() => inputRef.current?.click()}
-            className="flex aspect-square flex-col items-center cursor-pointer justify-center gap-1 rounded-xl border-[1.5px] border-dashed border-slate-300 text-slate-400 transition hover:border-rose-300 hover:text-rose-500"
+            className="flex aspect-square w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-[1.5px] border-dashed border-slate-300 bg-slate-50 px-4 text-center transition hover:border-rose-300"
           >
-            <Plus size={20} />
-            <span className="text-[11px] font-medium">Add Photo</span>
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-pink-500 to-rose-500 shadow-lg shadow-rose-200">
+              <Plus size={26} className="text-white" strokeWidth={2.5} />
+            </span>
+
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-bold text-slate-900">Add More</span>
+              <span className="text-[11px] leading-snug text-slate-400">
+                Upload more photos
+                <br />
+                to make your story complete
+              </span>
+            </span>
           </button>
         )}
       </div>
