@@ -5,8 +5,8 @@ const Logo = () => {
   return (
     <Link href="/" className="inline-flex items-center">
       <Image
-        src="/img/logo/1.svg"
-        alt="Jeevansathi"
+        src="/matrimony-logo.png"
+        alt="Tuz Maz Jamla"
         width={180}
         height={50}
         priority

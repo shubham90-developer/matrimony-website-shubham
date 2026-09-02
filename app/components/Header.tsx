@@ -130,7 +130,7 @@ const SEARCH_LINKS: SearchLink[] = [
   },
   {
     label: "Search by ID",
-    desc: "Find a profile using their Jeevansathi ID",
+    desc: "Find a profile using their Tuz Maz Jamla ID",
     url: "/search-by-id",
   },
 ];

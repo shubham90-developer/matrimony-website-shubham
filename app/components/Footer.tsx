@@ -64,7 +64,7 @@ const Footer = () => {
 
           <div className="w-full max-w-sm">
             <p className="font-serif text-lg font-semibold text-slate-900">
-              Download the Jeevansathi app
+              Download the Tuz Maz Jamla app
             </p>
 
             <div className="mt-4 flex items-center gap-4">
@@ -168,7 +168,8 @@ const Footer = () => {
         {/* Bottom bar */}
         <div className="flex flex-col items-center gap-4 border-t border-rose-100 py-8 sm:flex-row sm:justify-between ">
           <p className="order-2 text-xs text-black sm:order-1 font-serif">
-            &copy; {new Date().getFullYear()} Jeevansathi. All rights reserved.
+            &copy; {new Date().getFullYear()} Tuz Maz Jamla. All rights
+            reserved.
           </p>
 
           <div className="order-1 flex items-center gap-3 sm:order-2">

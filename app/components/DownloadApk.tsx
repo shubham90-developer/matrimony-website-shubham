@@ -11,7 +11,7 @@ const DownloadApk = () => {
         {/* Left: copy + download card */}
         <div className="w-full max-w-md text-center lg:text-left">
           <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl font-serif">
-            Download the Jeevansathi app
+            Download the Tuz Maz Jamla app
           </h2>
           <p className="mt-3 text-lg text-slate-600">
             Connect with your matches anytime, anywhere
@@ -70,7 +70,7 @@ const DownloadApk = () => {
           <div className="relative h-107.5 sm:h-120">
             <Image
               src="/img/download apk/4.png"
-              alt="Jeevansathi app screenshot on a phone"
+              alt="Tuz Maz Jamla app screenshot on a phone"
               fill
               sizes="(min-width: 1024px) 420px, 90vw"
               className="object-contain"

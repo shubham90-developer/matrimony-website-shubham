@@ -11,7 +11,7 @@ interface BreadcrumbProps {
 const Breadcrumb = ({
   title,
   currentPage,
-  subtitle = "Welcome to Jeevansathi",
+  subtitle = "Welcome to Tuz Maz Jamla",
   backgroundImage = "/img/home-banner/4.jpg",
 }: BreadcrumbProps) => {
   return (
