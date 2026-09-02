@@ -15,6 +15,8 @@ import { interestApi } from "./interestApi";
 import { ignoreApi } from "./ignoreApi";
 import { authApi } from "./authApi";
 import { packageApi } from "./packagesApi";
+import { termsApi } from "./terms";
+import { privacyPolicyApi } from "./privacy-policyApi";
 
 export const store = configureStore({
   reducer: {
@@ -32,6 +34,8 @@ export const store = configureStore({
     [ignoreApi.reducerPath]: ignoreApi.reducer,
     [authApi.reducerPath]: authApi.reducer,
     [packageApi.reducerPath]: packageApi.reducer,
+    [termsApi.reducerPath]: termsApi.reducer,
+    [privacyPolicyApi.reducerPath]: privacyPolicyApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -49,6 +53,8 @@ export const store = configureStore({
       ignoreApi.middleware,
       authApi.middleware,
       packageApi.middleware,
+      termsApi.middleware,
+      privacyPolicyApi.middleware,
     ),
 });
 
