@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import MyMatches from "./components/MyMatches";
 import MatchSidebar from "@/app/components/MatchSidebar";
+import MobileNavbar from "@/app/components/MobileNavbar";
 
 export const metadata: Metadata = {
   title: "My Matches | Your Website Name",
@@ -15,6 +16,7 @@ const MyMatchesPage = () => {
           <div className="grid grid-cols-1 gap-5 md:grid-cols-[300px_1fr]">
             <MatchSidebar />
             <MyMatches />
+            <MobileNavbar />
           </div>
         </div>
       </section>
