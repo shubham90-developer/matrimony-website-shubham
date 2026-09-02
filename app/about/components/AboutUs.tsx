@@ -157,7 +157,7 @@ const AboutUsPage = () => {
 
   return (
     <div className="w-full bg-[#FDF8F3] py-0 px-5 sm:px-8 lg:px-8">
-      <div className="mx-auto max-w-7xl bg-white p-8 py-15">
+      <div className="mx-auto max-w-7xl bg-white p-1 py-15">
         {/* Header */}
         <div className="mb-5 text-center">
           <span className="rounded-full bg-rose-100 px-4 py-1 text-xs font-bold tracking-widest text-rose-600 uppercase">

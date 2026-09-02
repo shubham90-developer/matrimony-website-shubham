@@ -2,6 +2,7 @@
 
 import {
   Baby,
+  BadgeCheck,
   Blocks,
   Briefcase,
   Calendar,
@@ -21,12 +22,9 @@ import {
   Moon,
   MoreVertical,
   Ruler,
-  Send,
   Share2,
-  ShieldCheck,
   Sparkles,
   Star,
-  UserRound,
   Utensils,
   Wallet,
   Wine,
@@ -527,11 +525,20 @@ const MyMatchesDetails = () => {
             <h1 className="font-serif text-2xl font-bold text-slate-900">
               {profile.name}, {profile.age}
             </h1>
-            <ShieldCheck size={18} className="text-emerald-500" />
+            <BadgeCheck
+              size={21}
+              className="shrink-0 fill-blue-500 text-white"
+            />
           </div>
-          <p className="mt-1 text-sm font-bold text-rose-500 ">
-            ID - {profile.id}
-          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-600">
+              ID - {profile.id}
+            </span>
+
+            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+              Profile Managed By: {profile.managedBy || "Self"}
+            </span>
+          </div>
         </div>
 
         {/* Info grid */}
@@ -659,8 +666,8 @@ const MyMatchesDetails = () => {
           {activeTab === "Looking For" && <LookingForTab profile={profile} />}
         </div>
 
-        <div className="sticky top-20 mt-15 rounded-3xl bg-rose-100 px-6 py-6">
-          <div className="flex items-start justify-around">
+        <div className="fixed inset-x-0 bottom-0 z-40 rounded-t-3xl bg-rose-100 px-6 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+          <div className="mx-auto flex max-w-md items-start justify-around">
             {actions.map(
               ({ icon: Icon, label, href, onClick, loading, variant }) => {
                 const content = (
@@ -704,7 +711,7 @@ const MyMatchesDetails = () => {
                     <Link
                       key={label}
                       href={href}
-                      className="flex flex-col items-center gap-2 group"
+                      className="group flex flex-col items-center gap-2"
                     >
                       {content}
                     </Link>
@@ -717,7 +724,7 @@ const MyMatchesDetails = () => {
                     type="button"
                     disabled={loading}
                     onClick={onClick}
-                    className="flex cursor-pointer flex-col items-center gap-2 group disabled:cursor-not-allowed"
+                    className="group flex cursor-pointer flex-col items-center gap-2 disabled:cursor-not-allowed"
                   >
                     {content}
                   </button>

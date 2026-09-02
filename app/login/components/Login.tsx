@@ -209,6 +209,10 @@ const Login = () => {
     }
   };
 
+  const handleGoogleLogin = () => {
+    // Google login logic
+  };
+
   return (
     <div className="w-full bg-[#FDF8F3] py-12 px-5 sm:px-8 lg:px-8">
       {/* Invisible reCAPTCHA required by Firebase Phone Auth */}
@@ -310,14 +314,55 @@ const Login = () => {
               We&apos;ll send you a {OTP_LENGTH} digit OTP
             </p>
 
-            <div className="flex items-center justify-center">
+            <div className="flex flex-col items-center justify-center gap-4">
+              {/* Get OTP Button */}
               <ThemeBtnOne
                 type="button"
                 disabled={phone.length !== 10 || sendingOtp}
                 onClick={handleGetOtp}
-                text={sendingOtp ? "Sending..." : " Get OTP"}
-                className="w-50 bg-rose-500 text-white py-4 cursor-pointer px-4 rounded-full font-serif"
+                text={sendingOtp ? "Sending..." : "Get OTP"}
+                className="w-75 bg-rose-500 text-white py-4 px-4 rounded-full font-serif cursor-pointer"
               />
+
+              {/* OR Divider */}
+              <div className="flex items-center w-full gap-3">
+                <div className="flex-1 h-px bg-gray-300" />
+                <span className="text-sm text-gray-500">OR</span>
+                <div className="flex-1 h-px bg-gray-300" />
+              </div>
+
+              {/* Google Login */}
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="w-75 md:w-100 flex cursor-pointer items-center justify-center gap-3 py-3.5 px-4 rounded-full border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 transition-all duration-200 shadow-sm"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="#4285F4"
+                    d="M21.35 12.27c0-.79-.07-1.55-.22-2.27H12v4.3h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.42Z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 21.75c2.63 0 4.84-.87 6.45-2.36l-3.14-2.45c-.87.58-1.98.93-3.31.93-2.54 0-4.69-1.72-5.46-4.03H3.3v2.53A9.75 9.75 0 0 0 12 21.75Z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M6.54 13.84A5.86 5.86 0 0 1 6.23 12c0-.64.11-1.27.31-1.84V7.63H3.3A9.75 9.75 0 0 0 2.25 12c0 1.57.38 3.06 1.05 4.37l3.24-2.53Z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 6.13c1.43 0 2.72.49 3.73 1.46l2.8-2.8C16.83 3.16 14.63 2.25 12 2.25A9.75 9.75 0 0 0 3.3 7.63l3.24 2.53C7.31 7.85 9.46 6.13 12 6.13Z"
+                  />
+                </svg>
+
+                <span>Continue with Google</span>
+              </button>
             </div>
           </div>
         )}

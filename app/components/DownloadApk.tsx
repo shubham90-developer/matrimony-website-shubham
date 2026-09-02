@@ -73,7 +73,7 @@ const DownloadApk = () => {
               alt="Jeevansathi app screenshot on a phone"
               fill
               sizes="(min-width: 1024px) 420px, 90vw"
-              className="object-contain"
+              className="object-cover md:object-contain"
             />
           </div>
         </div>

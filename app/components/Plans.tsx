@@ -32,7 +32,7 @@ const paidFeatures: PlanFeature[] = [
 const Plans = () => {
   return (
     <section className="w-full bg-[#FDF8F3] py-0 px-5 sm:px-8 lg:px-8 ">
-      <div className="mx-auto max-w-7xl bg-white p-8 py-15 relative">
+      <div className="mx-auto max-w-7xl bg-white  py-15 relative">
         {/* split background: cream on top, navy on bottom */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-rose-100" />
 
