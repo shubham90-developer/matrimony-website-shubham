@@ -1,9 +1,6 @@
 "use client";
 
-import Slider from "react-slick";
-import { ArrowLeft, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
+import { ArrowLeft, MapPin, X } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -28,11 +25,6 @@ interface CardProfile {
 
 const STATUS_CONFIG: Record<Status, { label: string; badgeClass: string }> = {
   sent: { label: "Pending", badgeClass: "bg-amber-500/90" },
-};
-
-// A sent interest can only be withdrawn — there's no secondary action.
-const STATUS_ACTIONS: Record<Status, { primary: string }> = {
-  sent: { primary: "Cancel" },
 };
 
 // ---------- Helpers: map API data -> CardProfile shape the UI expects ----------
@@ -65,63 +57,22 @@ function toCardProfile(
   };
 }
 
-function NextArrow({ onClick }: { onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Next"
-      className="absolute right-0 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm hover:text-stone-800"
-    >
-      <ChevronRight size={16} />
-    </button>
-  );
-}
-
-function PrevArrow({ onClick }: { onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Previous"
-      className="absolute left-0 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 -translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm hover:text-stone-800"
-    >
-      <ChevronLeft size={16} />
-    </button>
-  );
-}
-
-const SLIDER_SETTINGS = {
-  infinite: false,
-  speed: 300,
-  slidesToShow: 5,
-  slidesToScroll: 1,
-  nextArrow: <NextArrow />,
-  prevArrow: <PrevArrow />,
-  responsive: [
-    { breakpoint: 1280, settings: { slidesToShow: 4, slidesToScroll: 1 } },
-    { breakpoint: 1024, settings: { slidesToShow: 3, slidesToScroll: 1 } },
-    { breakpoint: 640, settings: { slidesToShow: 1, arrows: false } },
-  ],
-};
-
 function ProfileCard({
   profile,
   status,
-  onPrimaryAction,
+  onCancelAction,
 }: {
   profile: CardProfile;
   status: Status;
-  onPrimaryAction?: (id: string) => void;
+  onCancelAction?: (id: string) => void;
 }) {
   const { label, badgeClass } = STATUS_CONFIG[status];
-  const { primary } = STATUS_ACTIONS[status];
 
-  const handlePrimary = (e: React.MouseEvent) => {
+  const handleCancel = (e: React.MouseEvent) => {
     // keep the button from triggering the parent <Link> navigation
     e.preventDefault();
     e.stopPropagation();
-    onPrimaryAction?.(profile.id);
+    onCancelAction?.(profile.id);
   };
 
   return (
@@ -148,7 +99,17 @@ function ProfileCard({
         {label}
       </span>
 
-      {/* Bottom overlaid info + action button */}
+      {/* Cancel-interest icon button, top-right */}
+      <button
+        type="button"
+        onClick={handleCancel}
+        aria-label="Cancel interest"
+        className="absolute right-1.5 top-1.5 z-30 flex size-6 cursor-pointer items-center justify-center rounded-full bg-white/15 text-white backdrop-blur transition hover:bg-red-500/90 xs:right-2 xs:top-2 xs:size-7"
+      >
+        <X size={13} />
+      </button>
+
+      {/* Bottom overlaid info */}
       <div className="absolute inset-x-0 bottom-0 z-20 p-2 xs:p-2.5 sm:p-3">
         <p className="truncate text-xs font-semibold text-white xs:text-sm">
           {profile.name}, {profile.age}
@@ -164,14 +125,6 @@ function ProfileCard({
             {profile.meta}
           </p>
         )}
-
-        <button
-          type="button"
-          onClick={handlePrimary}
-          className="relative z-30 mt-2 w-full cursor-pointer rounded-lg bg-white/15 py-1.5 text-[10px] font-semibold text-white backdrop-blur transition hover:bg-white/25 xs:mt-2.5 xs:py-2 xs:text-xs"
-        >
-          {primary}
-        </button>
       </div>
     </Link>
   );
@@ -181,12 +134,12 @@ function ActivitySection({
   title,
   profiles,
   status,
-  onPrimaryAction,
+  onCancelAction,
 }: {
   title: string;
   profiles: CardProfile[];
   status: Status;
-  onPrimaryAction?: (id: string) => void;
+  onCancelAction?: (id: string) => void;
 }) {
   if (profiles.length === 0) {
     return (
@@ -203,20 +156,20 @@ function ActivitySection({
 
   return (
     <div className="border-b border-dashed border-gray-500 py-5">
-      <h3 className="mb-4 font-serif text-xl font-semibold text-slate-900">
-        {title}
-      </h3>
-      <div className="relative">
-        <Slider {...SLIDER_SETTINGS}>
-          {profiles.map((p) => (
-            <ProfileCard
-              key={p.id}
-              profile={p}
-              status={status}
-              onPrimaryAction={onPrimaryAction}
-            />
-          ))}
-        </Slider>
+      {title && (
+        <h3 className="mb-4 font-serif text-xl font-semibold text-slate-900">
+          {title}
+        </h3>
+      )}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {profiles.map((p) => (
+          <ProfileCard
+            key={p.id}
+            profile={p}
+            status={status}
+            onCancelAction={onCancelAction}
+          />
+        ))}
       </div>
     </div>
   );
@@ -287,7 +240,7 @@ export default function SentInterests() {
         title=""
         profiles={sentProfiles}
         status="sent"
-        onPrimaryAction={handleCancel}
+        onCancelAction={handleCancel}
       />
     </div>
   );

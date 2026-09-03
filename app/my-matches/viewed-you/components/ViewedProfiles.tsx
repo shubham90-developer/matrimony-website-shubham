@@ -1,9 +1,6 @@
 "use client";
 
-import Slider from "react-slick";
-import { ArrowLeft, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
+import { ArrowLeft, MapPin } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -29,46 +26,6 @@ const STATUS_CONFIG: Record<Status, { label: string; badgeClass: string }> = {
 // empty until that API is available.
 const VISITORS: CardProfile[] = [];
 
-function NextArrow({ onClick }: { onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Next"
-      className="absolute right-0 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm hover:text-stone-800"
-    >
-      <ChevronRight size={16} />
-    </button>
-  );
-}
-
-function PrevArrow({ onClick }: { onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Previous"
-      className="absolute left-0 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 -translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm hover:text-stone-800"
-    >
-      <ChevronLeft size={16} />
-    </button>
-  );
-}
-
-const SLIDER_SETTINGS = {
-  infinite: false,
-  speed: 300,
-  slidesToShow: 5,
-  slidesToScroll: 1,
-  nextArrow: <NextArrow />,
-  prevArrow: <PrevArrow />,
-  responsive: [
-    { breakpoint: 1280, settings: { slidesToShow: 4, slidesToScroll: 1 } },
-    { breakpoint: 1024, settings: { slidesToShow: 3, slidesToScroll: 1 } },
-    { breakpoint: 640, settings: { slidesToShow: 1, arrows: false } },
-  ],
-};
-
 function ProfileCard({
   profile,
   status,
@@ -79,42 +36,41 @@ function ProfileCard({
   const { label, badgeClass } = STATUS_CONFIG[status];
 
   return (
-    <div className="px-1.5">
-      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white transition hover:shadow-md">
-        <Link href="/my-matches/details">
-          <div className="relative aspect-3/4 cursor-pointer">
-            <Image
-              src={profile.image}
-              alt={profile.name}
-              fill
-              className="h-full w-full object-cover"
-            />
+    <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white transition hover:shadow-md">
+      <Link href="/my-matches/details">
+        <div className="relative aspect-3/4 cursor-pointer">
+          <Image
+            src={profile.image}
+            alt={profile.name}
+            fill
+            sizes="(max-width: 480px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+            className="h-full w-full object-cover"
+          />
 
-            <span
-              className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${badgeClass}`}
-            >
-              {label}
-            </span>
-          </div>
+          <span
+            className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${badgeClass}`}
+          >
+            {label}
+          </span>
+        </div>
 
-          <div className="p-2.5 pb-3">
-            <p className="truncate text-sm font-semibold text-slate-900">
-              {profile.name}, {profile.age}
+        <div className="p-2.5 pb-3">
+          <p className="truncate text-sm font-semibold text-slate-900">
+            {profile.name}, {profile.age}
+          </p>
+
+          <p className="mt-1 flex items-center gap-1 truncate text-xs text-stone-500">
+            <MapPin size={11} />
+            {profile.location}
+          </p>
+
+          {profile.meta && (
+            <p className="mt-1 truncate text-[11px] text-stone-400">
+              {profile.meta}
             </p>
-
-            <p className="mt-1 flex items-center gap-1 truncate text-xs text-stone-500">
-              <MapPin size={11} />
-              {profile.location}
-            </p>
-
-            {profile.meta && (
-              <p className="mt-1 truncate text-[11px] text-stone-400">
-                {profile.meta}
-              </p>
-            )}
-          </div>
-        </Link>
-      </div>
+          )}
+        </div>
+      </Link>
     </div>
   );
 }
@@ -143,15 +99,15 @@ function ActivitySection({
 
   return (
     <div className="border-b border-dashed border-gray-500 py-5">
-      <h3 className="mb-4 font-serif text-xl font-semibold text-slate-900">
-        {title}
-      </h3>
-      <div className="relative">
-        <Slider {...SLIDER_SETTINGS}>
-          {profiles.map((p) => (
-            <ProfileCard key={p.id} profile={p} status={status} />
-          ))}
-        </Slider>
+      {title && (
+        <h3 className="mb-4 font-serif text-xl font-semibold text-slate-900">
+          {title}
+        </h3>
+      )}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {profiles.map((p) => (
+          <ProfileCard key={p.id} profile={p} status={status} />
+        ))}
       </div>
     </div>
   );

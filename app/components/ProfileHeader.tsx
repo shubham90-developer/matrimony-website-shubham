@@ -10,7 +10,9 @@ const ProfileHeader = () => {
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-xs">
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Logo />
+        <Link href="/my-matches/matches">
+          <Logo />
+        </Link>
 
         {/* Right Icons */}
         <div className="flex items-center gap-3 sm:gap-5">

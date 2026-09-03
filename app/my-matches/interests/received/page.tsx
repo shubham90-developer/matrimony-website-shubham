@@ -1,6 +1,7 @@
 import MatchSidebar from "@/app/components/MatchSidebar";
 import React from "react";
 import ReceivedIntrest from "./components/ReceivedIntrest";
+import MobileNavbar from "@/app/components/MobileNavbar";
 
 const SentIntrestpage = () => {
   return (
@@ -11,6 +12,7 @@ const SentIntrestpage = () => {
             <MatchSidebar />
             <div className="min-w-0">
               <ReceivedIntrest />
+              <MobileNavbar />
             </div>
           </div>
         </div>

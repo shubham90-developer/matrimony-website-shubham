@@ -42,7 +42,7 @@ const SearchById = () => {
             Search by ID
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Find a profile using their Jeevansathi ID
+            Find a profile using their Tuza Maza Jamla.com ID
           </p>
         </div>
 

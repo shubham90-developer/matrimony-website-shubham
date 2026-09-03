@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import MatchSidebar from "@/app/components/MatchSidebar";
 import Activity from "./components/Activity";
+import MobileNavbar from "@/app/components/MobileNavbar";
 
 export const metadata: Metadata = {
   title: "My Chat | Your Website Name",
@@ -17,6 +18,7 @@ const ActivityPage = () => {
 
             <div className="min-w-0">
               <Activity />
+              <MobileNavbar />
             </div>
           </div>
         </div>

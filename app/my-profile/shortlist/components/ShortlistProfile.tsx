@@ -6,7 +6,6 @@ import {
   Briefcase,
   Ruler,
   HeartOff,
-  Eye,
   Loader2,
 } from "lucide-react";
 import Image from "next/image";
@@ -20,7 +19,7 @@ import {
 
 const FALLBACK_IMAGE = "/img/matches/1.jpg";
 
-interface RowProfile {
+interface CardProfile {
   shortlistId: string;
   id: string;
   name: string;
@@ -31,37 +30,54 @@ interface RowProfile {
   image: string;
 }
 
-const toRowProfile = (entry: ShortlistEntry): RowProfile => {
-  const p = entry.profile;
-  const basic = p?.basicDetails;
-  const career = p?.careerDetails;
-  const edu = p?.educationDetails;
+const toCardProfile = (entry: ShortlistEntry): CardProfile => {
+  // `entry.profile` may be missing on some API responses; in that case
+  // `entry.shortlistedUserId` itself comes back populated with the same
+  // shape (basicDetails, photos, matrimonyId, etc.) instead of being a
+  // plain string id. Normalize both cases here so we never hand a raw
+  // object to JSX.
+  const rawUser =
+    entry.profile ??
+    (typeof entry.shortlistedUserId === "object"
+      ? entry.shortlistedUserId
+      : undefined);
+
+  const basic = rawUser?.basicDetails;
+  const career = rawUser?.careerDetails;
+  const edu = rawUser?.educationDetails;
+
+  const fallbackId =
+    typeof entry.shortlistedUserId === "string" ? entry.shortlistedUserId : "";
 
   return {
     shortlistId: entry._id,
-    id: p?.matrimonyId || entry.shortlistedUserId,
+    id: rawUser?.matrimonyId || fallbackId || "N/A",
     name:
       `${basic?.firstName ?? ""} ${basic?.lastName ?? ""}`.trim() || "Unknown",
     age: basic?.age ?? 0,
     height: basic?.height ?? "",
-    location: p?.locationDetails?.city ?? "",
+    location: rawUser?.locationDetails?.city ?? "",
     profession: career?.occupation || edu?.occupation || "",
-    image: p?.photos?.[0] || FALLBACK_IMAGE,
+    image: rawUser?.photos?.[0] || FALLBACK_IMAGE,
   };
 };
 
-const ProfileRow = ({
+const ProfileCard = ({
   profile,
   onRemoved,
 }: {
-  profile: RowProfile;
+  profile: CardProfile;
   onRemoved: (shortlistId: string) => void;
 }) => {
   const [removeFromShortlist, { isLoading: removing }] =
     useRemoveFromShortlistMutation();
 
-  const handleRemove = async () => {
+  const handleRemove = async (e: React.MouseEvent) => {
+    // keep the button from triggering the parent <Link> navigation
+    e.preventDefault();
+    e.stopPropagation();
     if (removing) return;
+
     try {
       await removeFromShortlist(profile.shortlistId).unwrap();
       toast.success(`${profile.name} removed from shortlist`);
@@ -75,67 +91,70 @@ const ProfileRow = ({
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-gray-200 p-3">
-      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-stone-200">
-        <Image
-          src={profile.image}
-          alt="Profile"
-          width={56}
-          height={56}
-          className="h-full w-full object-cover"
-        />
-      </div>
+    <Link
+      href="/my-matches/details"
+      className="group relative block aspect-3/4 w-full overflow-hidden rounded-2xl border border-stone-200/70 bg-stone-900 shadow-[0_1px_2px_rgba(60,40,30,0.06),0_14px_28px_-18px_rgba(60,40,30,0.4)] transition-shadow duration-300 hover:shadow-[0_1px_2px_rgba(60,40,30,0.08),0_22px_38px_-18px_rgba(60,40,30,0.5)]"
+    >
+      {/* Photo fills the entire card as the background */}
+      <Image
+        src={profile.image}
+        alt={profile.name}
+        fill
+        sizes="(max-width: 480px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+        className="absolute inset-0 z-0 object-cover transition duration-500 group-hover:scale-105"
+      />
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2">
-          <p className="truncate font-serif text-base font-semibold text-slate-900">
-            {profile.name}
+      {/* Scrim: subtle at top so the badge stays legible, strong at bottom for text */}
+      <div className="pointer-events-none absolute inset-0 z-10 bg-linear-to-t from-black/85 via-black/25 to-black/0" />
+
+      {/* Shortlisted badge, top-left */}
+      <span className="absolute left-1.5 top-1.5 z-20 rounded-full bg-amber-500/90 px-2 py-0.5 text-[9px] font-semibold text-white xs:left-2 xs:top-2 xs:px-2.5 xs:py-1 xs:text-[10px]">
+        Shortlisted
+      </span>
+
+      {/* Bottom overlaid info + remove button */}
+      <div className="absolute inset-x-0 bottom-0 z-20 p-2 xs:p-2.5 sm:p-3">
+        <p className="truncate text-xs font-semibold text-white xs:text-sm">
+          {profile.name}, {profile.age}
+        </p>
+
+        <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-white/80 xs:text-xs">
+          <MapPin size={10} className="shrink-0 xs:size-[11px]" />
+          <span className="truncate">{profile.location}</span>
+        </p>
+
+        {profile.profession && (
+          <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-white/80 xs:text-xs">
+            <Briefcase size={10} className="shrink-0 xs:size-[11px]" />
+            <span className="truncate">{profile.profession}</span>
           </p>
-          <span className="shrink-0 text-xs text-gray-400">
-            {profile.age} yrs
-          </span>
-        </div>
-        <p className="text-xs text-gray-400">ID - {profile.id}</p>
+        )}
 
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-          <span className="flex items-center gap-1">
-            <Ruler size={12} className="text-slate-400" />
-            {profile.height}
-          </span>
-          <span className="flex items-center gap-1">
-            <Briefcase size={12} className="text-slate-400" />
-            {profile.profession}
-          </span>
-          <span className="flex items-center gap-1">
-            <MapPin size={12} className="text-slate-400" />
-            {profile.location}
-          </span>
-        </div>
-      </div>
+        <p className="mt-0.5 flex items-center gap-2 truncate text-[9px] text-white/60 xs:text-[11px]">
+          {profile.height && (
+            <span className="flex items-center gap-1">
+              <Ruler size={10} className="shrink-0" />
+              {profile.height}
+            </span>
+          )}
+          <span className="truncate">ID - {profile.id}</span>
+        </p>
 
-      <div className="flex shrink-0 flex-col items-center gap-2">
-        <Link
-          href={`/my-matches/details`}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-100"
-          aria-label={`View ${profile.name}'s profile`}
-        >
-          <Eye size={16} />
-        </Link>
         <button
           type="button"
           onClick={handleRemove}
           disabled={removing}
-          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-rose-100 text-rose-400 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={`Remove ${profile.name} from shortlist`}
+          className="relative z-30 mt-2 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-white/15 py-1.5 text-[10px] font-semibold text-white backdrop-blur transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-50 xs:mt-2.5 xs:py-2 xs:text-xs"
         >
           {removing ? (
-            <Loader2 size={16} className="animate-spin" />
+            <Loader2 size={13} className="animate-spin" />
           ) : (
-            <HeartOff size={16} />
+            <HeartOff size={13} />
           )}
+          {removing ? "Removing..." : "Remove"}
         </button>
       </div>
-    </div>
+    </Link>
   );
 };
 
@@ -159,7 +178,7 @@ const EmptyState = () => (
 const ShortlistProfile = () => {
   const { data, isLoading, isError } = useGetMyShortlistQuery();
 
-  const shortlisted = (data?.data ?? []).map(toRowProfile);
+  const shortlisted = (data?.data ?? []).map(toCardProfile);
 
   return (
     <>
@@ -167,7 +186,7 @@ const ShortlistProfile = () => {
       <div className="rounded-xl border border-gray-200 p-4">
         <div className="relative mb-4 flex items-center justify-center border-b border-dashed border-gray-200 py-3">
           <Link
-            href="/my-profile"
+            href="/my-matches/activity"
             className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-100"
             aria-label="Go back"
           >
@@ -188,9 +207,9 @@ const ShortlistProfile = () => {
             Unable to load shortlisted profiles. Please try again.
           </div>
         ) : shortlisted.length > 0 ? (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {shortlisted.map((profile) => (
-              <ProfileRow
+              <ProfileCard
                 key={profile.shortlistId}
                 profile={profile}
                 onRemoved={() => {}}

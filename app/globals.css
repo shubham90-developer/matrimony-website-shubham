@@ -30,6 +30,11 @@ body {
   background: #fff8f8 !important;
   border-radius: 9999px;
 }
+
+input[type="checkbox"] {
+  accent-color: #f43f5e; /* rose-500 */
+  cursor: pointer;
+}
 /* ===========================================
    THEME BUTTON
 =========================================== */

@@ -15,6 +15,9 @@ import {
   Star,
   Clock,
   Images,
+  HeartPulse,
+  UserRound,
+  HandHeartIcon,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -163,34 +166,35 @@ const MyProfile = () => {
           alt={profile.name}
           fill
           priority
-          className="object-contain object-top"
+          className="object-cover object-center"
           sizes="100vw"
         />
 
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
+        {/* Dark gradient overlay */}
+        <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/20 to-transparent" />
 
         {/* Actions */}
         <div className="absolute top-4 right-4 flex gap-2">
           <Link
             href="/my-profile/add-profile"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition hover:bg-black/60"
           >
             <Images size={18} />
           </Link>
 
-          <button className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
+          <button className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition hover:bg-black/60">
             <Share2 size={18} />
           </button>
         </div>
 
         {/* Bottom Content */}
-        <div className="absolute bottom-0 left-0 right-0 px-5 py-5">
+        <div className="absolute inset-x-0 bottom-0 px-5 py-5">
           <h4 className="font-serif text-2xl font-bold text-white">
             {profile.name}
           </h4>
-          <p className="mt-1 text-sm font-medium text-white/80">
-            ID - {profile.id}
+
+          <p className="mt-2 inline-flex rounded-full border border-white/20 bg-black/40 px-3 py-1 text-sm font-medium text-white backdrop-blur-md">
+            Member ID - {profile.id}
           </p>
         </div>
       </div>
@@ -220,12 +224,42 @@ const MyProfile = () => {
               subtitle="Describe yourself in a few words"
               editHref={EDIT_ROUTES.aboutMe}
             >
-              <p className="text-md text-black leading-relaxed mb-3">
-                {profile.bio}
-              </p>
-              <div className="text-xs text-gray-900 space-y-1 border-t border-stone-100 pt-2">
-                <p>Disability - {profile.disability}</p>
-                <p>Thalassemia - {profile.thalassemia}</p>
+              {/* Bio */}
+              <div className="flex gap-3">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-500">
+                  <UserRound size={17} />
+                </div>
+
+                <p className="text-md leading-relaxed text-black">
+                  {profile.bio}
+                </p>
+              </div>
+
+              {/* Additional Information */}
+              <div className="mt-4 space-y-2 border-t border-stone-100 pt-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600">
+                    <HandHeartIcon size={16} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-stone-400">Disability</p>
+                    <p className="text-sm font-medium text-stone-800">
+                      {profile.disability}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600">
+                    <HeartPulse size={16} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-stone-400">Thalassemia</p>
+                    <p className="text-sm font-medium text-stone-800">
+                      {profile.thalassemia}
+                    </p>
+                  </div>
+                </div>
               </div>
             </SectionCard>
 
@@ -346,30 +380,74 @@ const MyProfile = () => {
                 </p>
               )}
             </SectionCard>
-
             <SectionCard
               title="Contact"
               subtitle="Details that would get profiles in touch with you"
               editHref={EDIT_ROUTES.contact}
             >
               <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm text-blue-600">
-                  <Mail size={16} className="text-stone-400 shrink-0" />
-                  {profile.contact.email}
+                {/* Email */}
+                <div className="flex items-center gap-3 rounded-xl bg-blue-50 px-3 py-2.5">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                    <Mail size={17} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium text-blue-500">
+                      Email
+                    </p>
+                    <p className="truncate text-sm font-medium text-stone-800">
+                      {profile.contact.email}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-stone-700">
-                  <Phone size={16} className="text-stone-400 shrink-0" />
-                  {profile.contact.phone}
+
+                {/* Phone */}
+                <div className="flex items-center gap-3 rounded-xl bg-emerald-50 px-3 py-2.5">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                    <Phone size={17} />
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-medium text-emerald-500">
+                      Phone
+                    </p>
+                    <p className="text-sm font-medium text-stone-800">
+                      {profile.contact.phone}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-stone-700">
-                  <Phone size={16} className="text-stone-400 shrink-0" />
-                  {profile.contact.altPhone}
-                  <span className="text-xs text-gray-400">(Alternate)</span>
+
+                {/* Alternate Phone */}
+                <div className="flex items-center gap-3 rounded-xl bg-orange-50 px-3 py-2.5">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-600">
+                    <Phone size={17} />
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-medium text-orange-500">
+                      Alternate Phone
+                    </p>
+                    <p className="text-sm font-medium text-stone-800">
+                      {profile.contact.altPhone}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-blue-600">
-                  <Mail size={16} className="text-stone-400 shrink-0" />
-                  {profile.contact.altEmail}
-                  <span className="text-xs text-gray-400">(Alternate)</span>
+
+                {/* Alternate Email */}
+                <div className="flex items-center gap-3 rounded-xl bg-purple-50 px-3 py-2.5">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-600">
+                    <Mail size={17} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium text-purple-500">
+                      Alternate Email
+                    </p>
+                    <p className="truncate text-sm font-medium text-stone-800">
+                      {profile.contact.altEmail}
+                    </p>
+                  </div>
                 </div>
               </div>
             </SectionCard>

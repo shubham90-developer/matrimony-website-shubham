@@ -1,9 +1,6 @@
 "use client";
 
-import Slider from "react-slick";
-import { ArrowLeft, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
+import { ArrowLeft, MapPin } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -30,6 +27,10 @@ interface CardProfile {
 
 const STATUS_CONFIG: Record<Status, { label: string; badgeClass: string }> = {
   received: { label: "Interested", badgeClass: "bg-rose-500/90" },
+};
+
+const STATUS_ACTIONS: Record<Status, { primary: string; secondary: string }> = {
+  received: { primary: "Accept", secondary: "Decline" },
 };
 
 // ---------- Helpers: map API data -> CardProfile shape the UI expects ----------
@@ -62,50 +63,6 @@ function toCardProfile(
   };
 }
 
-function NextArrow({ onClick }: { onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Next"
-      className="absolute right-0 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm hover:text-stone-800"
-    >
-      <ChevronRight size={16} />
-    </button>
-  );
-}
-
-function PrevArrow({ onClick }: { onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Previous"
-      className="absolute left-0 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 -translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 shadow-sm hover:text-stone-800"
-    >
-      <ChevronLeft size={16} />
-    </button>
-  );
-}
-
-const SLIDER_SETTINGS = {
-  infinite: false,
-  speed: 300,
-  slidesToShow: 5,
-  slidesToScroll: 1,
-  nextArrow: <NextArrow />,
-  prevArrow: <PrevArrow />,
-  responsive: [
-    { breakpoint: 1280, settings: { slidesToShow: 4, slidesToScroll: 1 } },
-    { breakpoint: 1024, settings: { slidesToShow: 3, slidesToScroll: 1 } },
-    { breakpoint: 640, settings: { slidesToShow: 1, arrows: false } },
-  ],
-};
-
-const STATUS_ACTIONS: Record<Status, { primary: string; secondary: string }> = {
-  received: { primary: "Accept", secondary: "Decline" },
-};
-
 function ProfileCard({
   profile,
   status,
@@ -121,62 +78,61 @@ function ProfileCard({
   const actions = STATUS_ACTIONS[status];
 
   return (
-    <div className="px-1.5">
-      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white transition hover:shadow-md">
-        <Link href="/my-matches/details">
-          <div className="relative aspect-3/4 cursor-pointer">
-            <Image
-              src={profile.image}
-              alt={profile.name}
-              fill
-              className="h-full w-full object-cover"
-            />
+    <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white transition hover:shadow-md">
+      <Link href="/my-matches/details">
+        <div className="relative aspect-3/4 cursor-pointer">
+          <Image
+            src={profile.image}
+            alt={profile.name}
+            fill
+            sizes="(max-width: 480px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+            className="h-full w-full object-cover"
+          />
 
-            <span
-              className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${badgeClass}`}
-            >
-              {label}
-            </span>
-          </div>
+          <span
+            className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${badgeClass}`}
+          >
+            {label}
+          </span>
+        </div>
 
-          <div className="p-2.5 pb-3">
-            <p className="truncate text-sm font-semibold text-slate-900">
-              {profile.name}, {profile.age}
+        <div className="p-2.5 pb-3">
+          <p className="truncate text-sm font-semibold text-slate-900">
+            {profile.name}, {profile.age}
+          </p>
+
+          <p className="mt-1 flex items-center gap-1 truncate text-xs text-stone-500">
+            <MapPin size={11} />
+            {profile.location}
+          </p>
+
+          {profile.meta && (
+            <p className="mt-1 truncate text-[11px] text-stone-400">
+              {profile.meta}
             </p>
+          )}
+        </div>
+      </Link>
 
-            <p className="mt-1 flex items-center gap-1 truncate text-xs text-stone-500">
-              <MapPin size={11} />
-              {profile.location}
-            </p>
+      {actions && (
+        <div className="flex gap-2 border-t border-stone-100 p-2.5">
+          <button
+            type="button"
+            onClick={() => onPrimaryAction?.(profile.id)}
+            className="flex-1 cursor-pointer rounded-lg bg-emerald-500 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600"
+          >
+            {actions.primary}
+          </button>
 
-            {profile.meta && (
-              <p className="mt-1 truncate text-[11px] text-stone-400">
-                {profile.meta}
-              </p>
-            )}
-          </div>
-        </Link>
-
-        {actions && (
-          <div className="flex gap-2 border-t border-stone-100 p-2.5">
-            <button
-              type="button"
-              onClick={() => onPrimaryAction?.(profile.id)}
-              className="flex-1 rounded-lg bg-emerald-500 py-2 text-xs font-semibold text-white transition hover:bg-emerald-600"
-            >
-              {actions.primary}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSecondaryAction?.(profile.id)}
-              className="flex-1 rounded-lg bg-stone-100 py-2 text-xs font-semibold text-stone-700 transition hover:bg-stone-200"
-            >
-              {actions.secondary}
-            </button>
-          </div>
-        )}
-      </div>
+          <button
+            type="button"
+            onClick={() => onSecondaryAction?.(profile.id)}
+            className="flex-1 cursor-pointer rounded-lg bg-stone-100 py-2 text-xs font-semibold text-stone-700 transition hover:bg-stone-200"
+          >
+            {actions.secondary}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -209,21 +165,21 @@ function ActivitySection({
 
   return (
     <div className="border-b border-dashed border-gray-500 py-5">
-      <h3 className="mb-4 font-serif text-xl font-semibold text-slate-900">
-        {title}
-      </h3>
-      <div className="relative">
-        <Slider {...SLIDER_SETTINGS}>
-          {profiles.map((p) => (
-            <ProfileCard
-              key={p.id}
-              profile={p}
-              status={status}
-              onPrimaryAction={onPrimaryAction}
-              onSecondaryAction={onSecondaryAction}
-            />
-          ))}
-        </Slider>
+      {title && (
+        <h3 className="mb-4 font-serif text-xl font-semibold text-slate-900">
+          {title}
+        </h3>
+      )}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {profiles.map((p) => (
+          <ProfileCard
+            key={p.id}
+            profile={p}
+            status={status}
+            onPrimaryAction={onPrimaryAction}
+            onSecondaryAction={onSecondaryAction}
+          />
+        ))}
       </div>
     </div>
   );

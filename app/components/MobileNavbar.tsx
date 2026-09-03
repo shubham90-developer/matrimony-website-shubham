@@ -73,7 +73,7 @@ const MobileNavbar = () => {
 
               {/* Label */}
               <span
-                className={`relative mt-1 text-[10px] font-semibold ${
+                className={`relative mt-1 text-[10px] font-bold ${
                   isActive ? "text-rose-600" : "text-black"
                 }`}
               >

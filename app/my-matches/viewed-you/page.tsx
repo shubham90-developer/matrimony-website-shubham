@@ -1,6 +1,7 @@
 import MatchSidebar from "@/app/components/MatchSidebar";
 import React from "react";
 import ProfileVisitors from "./components/ViewedProfiles";
+import MobileNavbar from "@/app/components/MobileNavbar";
 
 export const metadata = {
   title: "Viewed You | Your Website Name",
@@ -16,6 +17,7 @@ const ViewedYouPage = () => {
             <MatchSidebar />
             <div className="min-w-0">
               <ProfileVisitors />
+              <MobileNavbar />
             </div>
           </div>
         </div>
