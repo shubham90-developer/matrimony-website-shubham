@@ -12,7 +12,7 @@ type PlanFeature = {
 const freeFeatures: PlanFeature[] = [
   { label: "Browse Profiles", included: true },
   { label: "Shortlist & Send Interest", included: true },
-  { label: "Message & chat with unlimited users", included: true },
+  { label: "Message & chat with unlimited users", included: false },
   { label: "Get up to 3x more matches daily", included: false },
   { label: "Unlock access to advanced search", included: false },
   { label: "View contact details", included: false },
