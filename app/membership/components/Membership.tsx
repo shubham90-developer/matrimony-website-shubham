@@ -1,7 +1,16 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Check, Crown, Sparkles, Heart, Star, Award, Gem } from "lucide-react";
+import {
+  Check,
+  Crown,
+  Sparkles,
+  Heart,
+  Star,
+  Award,
+  Gem,
+  X,
+} from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import {
   useGetPackagesQuery,
@@ -10,7 +19,10 @@ import {
 import {
   useCreateOrderMutation,
   useVerifyPaymentMutation,
+  usePreviewPaymentMutation,
+  type PreviewPaymentData,
 } from "@/Redux/paymentApi";
+import { useGetMyProfileQuery } from "@/Redux/profileApi";
 import {
   loadRazorpayScript,
   type RazorpaySuccessResponse,
@@ -28,11 +40,24 @@ const formatDuration = (duration: number, durationType: string) => {
 
 const Membership = () => {
   const { data, isLoading, isError, refetch } = useGetPackagesQuery();
+  const { data: profileData } = useGetMyProfileQuery();
   const [selected, setSelected] = useState<string | null>(null);
   const [payingPlanId, setPayingPlanId] = useState<string | null>(null);
 
   const [createOrder] = useCreateOrderMutation();
   const [verifyPayment] = useVerifyPaymentMutation();
+  const [previewPayment] = usePreviewPaymentMutation();
+
+  // ── Upgrade preview modal state ─────────────────────────────────
+  const [previewLoadingPlanId, setPreviewLoadingPlanId] = useState<
+    string | null
+  >(null);
+  const [previewPlan, setPreviewPlan] = useState<MembershipPackage | null>(
+    null,
+  );
+  const [previewInfo, setPreviewInfo] = useState<PreviewPaymentData | null>(
+    null,
+  );
 
   const packages = useMemo(() => {
     const list = (data?.data ?? []).filter((pkg) => !pkg.isDeleted);
@@ -41,8 +66,25 @@ const Membership = () => {
 
   const activeSelection = selected ?? packages[packages.length - 1]?._id;
 
-  const handleChoosePlan = async (pkg: MembershipPackage) => {
-    setSelected(pkg._id);
+  const subscription = profileData?.data?.subscription;
+  const hasActiveSubscription = Boolean(subscription?.isActive);
+  const currentPackageId = subscription?.packageId;
+  const currentPackage = useMemo(
+    () => packages.find((p) => p._id === currentPackageId) || null,
+    [packages, currentPackageId],
+  );
+
+  // Only treat this as an "upgrade" (needing a preview/proration step) when
+  // the user already has an active plan, is choosing a *different* plan,
+  // and the new plan costs more than their current one.
+  const isUpgradeCandidate = (pkg: MembershipPackage) =>
+    hasActiveSubscription &&
+    Boolean(currentPackageId) &&
+    pkg._id !== currentPackageId &&
+    (!currentPackage || pkg.price > currentPackage.price);
+
+  // ── Actually start Razorpay checkout + create-order flow ───────────
+  const startCheckout = async (pkg: MembershipPackage) => {
     setPayingPlanId(pkg._id);
 
     try {
@@ -62,6 +104,8 @@ const Membership = () => {
       }
 
       // 2. Ask our backend to validate the package and create a Razorpay order
+      //    (backend applies any upgrade proration itself; the preview step is
+      //    only used to show the user what they'll pay before confirming)
       const orderRes = await createOrder({ packageId: pkg._id }).unwrap();
       const { orderId, amount, currency } = orderRes.data;
 
@@ -103,6 +147,54 @@ const Membership = () => {
       toast.error("Couldn't start the payment. Please try again.");
       setPayingPlanId(null);
     }
+  };
+
+  // ── Entry point from the plan card's CTA button ─────────────────────
+  const handleChoosePlan = async (pkg: MembershipPackage) => {
+    setSelected(pkg._id);
+
+    // No active subscription, or same/lower plan — go straight to checkout
+    // exactly like before, no extra step.
+    if (!isUpgradeCandidate(pkg)) {
+      startCheckout(pkg);
+      return;
+    }
+
+    // Upgrading from an active plan — fetch the discounted payable amount
+    // first and let the user confirm before opening Razorpay.
+    const profileId = profileData?.data?._id;
+    if (!profileId) {
+      // Fallback: if profile id isn't available for some reason, don't block
+      // the user — proceed with the normal checkout flow.
+      startCheckout(pkg);
+      return;
+    }
+
+    setPreviewLoadingPlanId(pkg._id);
+    try {
+      const previewRes = await previewPayment({
+        profileId,
+        packageId: pkg._id,
+      }).unwrap();
+      setPreviewPlan(pkg);
+      setPreviewInfo(previewRes.data);
+    } catch {
+      toast.error("Couldn't calculate upgrade pricing. Please try again.");
+    } finally {
+      setPreviewLoadingPlanId(null);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewPlan(null);
+    setPreviewInfo(null);
+  };
+
+  const confirmUpgrade = () => {
+    if (!previewPlan) return;
+    const pkg = previewPlan;
+    closePreview();
+    startCheckout(pkg);
   };
 
   return (
@@ -173,6 +265,10 @@ const Membership = () => {
                         100,
                     ))
                   : null;
+              const isCurrentPlan =
+                hasActiveSubscription && plan._id === currentPackageId;
+              const isBusy =
+                payingPlanId === plan._id || previewLoadingPlanId === plan._id;
 
               return (
                 <div
@@ -244,7 +340,7 @@ const Membership = () => {
                   {/* CTA */}
                   <button
                     type="button"
-                    disabled={payingPlanId === plan._id}
+                    disabled={isBusy || isCurrentPlan}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleChoosePlan(plan);
@@ -255,11 +351,15 @@ const Membership = () => {
                         : "bg-rose-50 text-rose-600 hover:bg-rose-100"
                     }`}
                   >
-                    {payingPlanId === plan._id
-                      ? "Processing..."
-                      : featured
-                        ? `Start ${plan.title}`
-                        : `Choose ${plan.title}`}
+                    {isCurrentPlan
+                      ? "Current Plan"
+                      : previewLoadingPlanId === plan._id
+                        ? "Calculating..."
+                        : payingPlanId === plan._id
+                          ? "Processing..."
+                          : featured
+                            ? `Start ${plan.title}`
+                            : `Choose ${plan.title}`}
                   </button>
 
                   {/* Features */}
@@ -290,6 +390,80 @@ const Membership = () => {
           of taxes. Cancel your renewal any time.
         </p>
       </div>
+
+      {/* ── Upgrade preview confirmation modal ─────────────────────── */}
+      {previewPlan && previewInfo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={closePreview}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-white p-7 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <h3 className="font-serif text-xl font-bold text-slate-900">
+                Upgrade to {previewInfo.packageName}
+              </h3>
+              <button
+                type="button"
+                onClick={closePreview}
+                className="text-slate-400 hover:text-slate-600"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-3 rounded-2xl bg-rose-50/60 p-4 text-sm">
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Plan price</span>
+                <span className="font-semibold text-slate-900">
+                  &#8377;{previewInfo.packagePrice.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Credit from current plan</span>
+                <span className="font-semibold text-emerald-600">
+                  − &#8377;{previewInfo.unusedAmount.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Remaining days on current plan</span>
+                <span className="font-semibold text-slate-900">
+                  {previewInfo.remainingDays}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between border-t border-rose-100 pt-3">
+                <span className="font-semibold text-slate-900">
+                  You pay now
+                </span>
+                <span className="font-serif text-2xl font-bold text-rose-600">
+                  &#8377;{previewInfo.payableAmount.toLocaleString("en-IN")}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={closePreview}
+                className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmUpgrade}
+                className="flex-1 rounded-full bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700"
+              >
+                Confirm &amp; Pay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Toaster position="top-center" reverseOrder={false} />
     </section>
   );

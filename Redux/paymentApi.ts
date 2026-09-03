@@ -33,6 +33,28 @@ export interface VerifyPaymentResponse {
   data?: unknown;
 }
 
+// ---------- preview (upgrade proration) ----------
+export interface PreviewPaymentRequest {
+  profileId: string;
+  packageId: string;
+}
+
+export interface PreviewPaymentData {
+  packageId: string;
+  packageName: string;
+  packagePrice: number;
+  unusedAmount: number;
+  remainingDays: number;
+  payableAmount: number;
+  currency: string;
+}
+
+export interface PreviewPaymentResponse {
+  success: boolean;
+  message?: string;
+  data: PreviewPaymentData;
+}
+
 export const paymentApi = createApi({
   reducerPath: "paymentApi",
   tagTypes: ["Payment"],
@@ -59,7 +81,22 @@ export const paymentApi = createApi({
       }),
       invalidatesTags: ["Payment"],
     }),
+
+    previewPayment: builder.mutation<
+      PreviewPaymentResponse,
+      PreviewPaymentRequest
+    >({
+      query: (body) => ({
+        url: "/payment/preview",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
-export const { useCreateOrderMutation, useVerifyPaymentMutation } = paymentApi;
+export const {
+  useCreateOrderMutation,
+  useVerifyPaymentMutation,
+  usePreviewPaymentMutation,
+} = paymentApi;
