@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import Breadcrumb from "../components/Breadcrumb";
 import Membership from "./components/Membership";
+import MobileNavbar from "../components/MobileNavbar";
 
 export const metadata: Metadata = {
   title: "Membership | Your Website Name",
@@ -16,6 +17,7 @@ const MembershipPage = () => {
         backgroundImage="/img/home-banner/4.jpg"
       />
       <Membership />
+      <MobileNavbar />
     </>
   );
 };

@@ -1,13 +1,13 @@
 import React from "react";
 import TopCounter from "./TopCounter";
-import ActivityProfiles from "./ActivityProfiles";
+import InterestsPanel from "./InterestsPanel";
 
 const Activity = () => {
   return (
     <>
       <section className="space-y-6">
         <TopCounter />
-        <ActivityProfiles />
+        <InterestsPanel />
       </section>
     </>
   );

@@ -36,7 +36,8 @@ const ShadiExperience = () => {
     <section className="w-full bg-[#FDF8F3] py-0 px-5 sm:px-8 lg:px-8">
       <div className="mx-auto max-w-7xl bg-white p-8 py-15">
         <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl font-serif">
-          The Tuza Maza Jamla <span className="text-rose-600">Experience</span>
+          The Tuza Maza Jamla.com &nbsp;
+          <span className="text-rose-600">Experience</span>
         </h2>
 
         {/* Feature cards */}
@@ -63,12 +64,12 @@ const ShadiExperience = () => {
           })}
         </div>
 
-        {/* VIP Shaadi banner */}
+        {/* VIP Tuza Maza Jamla.combanner */}
         <div className="mt-8 flex flex-col items-start gap-6 rounded-2xl bg-purple-50 p-8 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:gap-8">
             <p className="max-w-md text-lg text-slate-800">
               Experience the world of elite personalised matchmaking by{" "}
-              <span className="font-medium">TuzaMazaJamla.com</span>
+              <span className="font-medium">Tuza Maza Jamla.com</span>
             </p>
           </div>
 

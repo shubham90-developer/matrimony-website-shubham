@@ -13,7 +13,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useRef, useState } from "react";
+import Select, { SingleValue, StylesConfig } from "react-select";
 import toast, { Toaster } from "react-hot-toast";
+
 import { useGetHeightsQuery } from "@/Redux/heightApi";
 import { useGetQualificationsQuery } from "@/Redux/qualificationApi";
 import { useGetOccupationsQuery } from "@/Redux/occupationApi";
@@ -22,15 +24,26 @@ import { useGetReligionsQuery } from "@/Redux/religionApi";
 import { useGetCastesByReligionQuery } from "@/Redux/casteApi";
 import { useGetSubCastesByCasteQuery } from "@/Redux/subCasteApi";
 import { useGetMotherTonguesQuery } from "@/Redux/motherToungeApi";
+
 import { Country, State, City } from "country-state-city";
+
 import {
   useAddProfileMutation,
   useUploadProfilePhotosMutation,
   ProfilePayload,
 } from "@/Redux/profileApi";
 
+
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+/* =========================================================
+   TYPES
+========================================================= */
+
 type Gender = "male" | "female";
+
 type ProfileFor = "self" | "someone-else";
+
 type MaritalStatus = "never-married" | "married" | "divorced" | "widowed";
 
 type ProfileImage = {
@@ -38,6 +51,15 @@ type ProfileImage = {
   file: File;
   url: string;
 };
+
+type SelectOption = {
+  value: string;
+  label: string;
+};
+
+/* =========================================================
+   STEPS
+========================================================= */
 
 const STEPS = [
   "profile",
@@ -54,20 +76,23 @@ const STEPS = [
   "About",
   "profileimages",
 ] as const;
+
 type StepKey = (typeof STEPS)[number];
 
-// Steps up to (but excluding) "horoscope" require every field on that step
-// to be filled before the user can move to Next. Steps from "horoscope"
-// onward remain optional, as requested.
 const HOROSCOPE_STEP_INDEX = STEPS.indexOf("horoscope");
 
-// Extracts a readable message out of a backend error response.
-// Handles the common Zod-style shape:
-// { success: false, message: "[{ ...  \"message\": \"Too small...\" }]" }
-// where `message` is itself a JSON-stringified array of issues.
+/* =========================================================
+   BACKEND ERROR
+========================================================= */
+
 function getBackendErrorMessage(err: unknown, fallback: string): string {
-  const backendMessage = (err as { data?: { message?: unknown } })?.data
-    ?.message;
+  const backendMessage = (
+    err as {
+      data?: {
+        message?: unknown;
+      };
+    }
+  )?.data?.message;
 
   if (typeof backendMessage !== "string" || !backendMessage.trim()) {
     return fallback;
@@ -75,196 +100,416 @@ function getBackendErrorMessage(err: unknown, fallback: string): string {
 
   try {
     const parsed = JSON.parse(backendMessage);
+
     if (Array.isArray(parsed) && parsed.length > 0) {
-      // Join all issue messages so the user sees everything the backend flagged.
       const messages = parsed
         .map((issue) => issue?.message)
         .filter((m): m is string => typeof m === "string" && m.length > 0);
-      if (messages.length) return messages.join(" ");
+
+      if (messages.length) {
+        return messages.join(" ");
+      }
     }
   } catch {
-    // Not JSON — it's already a plain string message.
+    // Plain string
   }
 
   return backendMessage;
 }
 
+/* =========================================================
+   REACT SELECT STYLES
+========================================================= */
+
+const selectStyles: StylesConfig<SelectOption, false> = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: "56px",
+    height: "56px",
+    borderRadius: "16px",
+    borderColor: state.isFocused ? "#fb7185" : "#e2e8f0",
+    boxShadow: state.isFocused ? "0 0 0 3px rgba(244,63,94,0.08)" : "none",
+    backgroundColor: "#ffffff",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+
+    "&:hover": {
+      borderColor: "#fda4af",
+    },
+  }),
+
+  valueContainer: (base) => ({
+    ...base,
+    padding: "0 16px",
+  }),
+
+  singleValue: (base) => ({
+    ...base,
+    color: "#0f172a",
+    fontSize: "15px",
+    fontWeight: 500,
+  }),
+
+  placeholder: (base) => ({
+    ...base,
+    color: "#94a3b8",
+    fontSize: "15px",
+  }),
+
+  input: (base) => ({
+    ...base,
+    color: "#0f172a",
+    fontSize: "15px",
+  }),
+
+  indicatorSeparator: () => ({
+    display: "none",
+  }),
+
+  dropdownIndicator: (base, state) => ({
+    ...base,
+    color: state.isFocused ? "#f43f5e" : "#94a3b8",
+    paddingRight: "14px",
+
+    "&:hover": {
+      color: "#f43f5e",
+    },
+  }),
+
+  clearIndicator: (base) => ({
+    ...base,
+    color: "#94a3b8",
+    cursor: "pointer",
+
+    "&:hover": {
+      color: "#f43f5e",
+    },
+  }),
+
+  menu: (base) => ({
+    ...base,
+    marginTop: "6px",
+    borderRadius: "16px",
+    overflow: "hidden",
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 15px 35px rgba(15,23,42,0.12)",
+    zIndex: 100,
+  }),
+
+  menuList: (base) => ({
+    ...base,
+    padding: "6px",
+    maxHeight: "260px",
+  }),
+
+  option: (base, state) => ({
+    ...base,
+    borderRadius: "10px",
+    padding: "11px 12px",
+    fontSize: "14px",
+    cursor: "pointer",
+
+    backgroundColor: state.isSelected
+      ? "#f43f5e"
+      : state.isFocused
+        ? "#fff1f2"
+        : "#ffffff",
+
+    color: state.isSelected ? "#ffffff" : "#0f172a",
+
+    "&:active": {
+      backgroundColor: "#f43f5e",
+      color: "#ffffff",
+    },
+  }),
+
+  noOptionsMessage: (base) => ({
+    ...base,
+    color: "#64748b",
+    fontSize: "13px",
+  }),
+};
+
+/* =========================================================
+   SEARCHABLE SELECT COMPONENT
+========================================================= */
+
+interface SearchSelectProps {
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+const SearchSelect = ({
+  value,
+  options,
+  onChange,
+  placeholder = "Select...",
+  disabled = false,
+}: SearchSelectProps) => {
+  const selectedOption = options.find((item) => item.value === value) ?? null;
+
+  return (
+    <Select<SelectOption, false>
+      value={selectedOption}
+      options={options}
+      onChange={(option: SingleValue<SelectOption>) =>
+        onChange(option?.value ?? "")
+      }
+      placeholder={placeholder}
+      isSearchable
+      isClearable
+      isDisabled={disabled}
+      styles={selectStyles}
+      noOptionsMessage={() => "No options found"}
+      menuPlacement="auto"
+    />
+  );
+};
+
+/* =========================================================
+   OPTION GROUP
+========================================================= */
+
+const OptionGroup = ({
+  title,
+  options,
+  value,
+  onChange,
+}: {
+  title: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) => (
+  <div>
+    <h2 className="mb-3 text-md font-bold text-slate-900">{title}</h2>
+
+    <div className="flex flex-wrap gap-3">
+      {options.map((item) => (
+        <button
+          key={item}
+          type="button"
+          onClick={() => onChange(item)}
+          className={`rounded-full border px-5 py-2.5 text-sm font-semibold transition cursor-pointer ${
+            value === item
+              ? "border-rose-400 bg-rose-50 text-rose-600"
+              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+          }`}
+        >
+          {item}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+/* =========================================================
+   REGISTER
+========================================================= */
+
 const Register = () => {
-  const { data: heightsRes, isLoading: heightsLoading } = useGetHeightsQuery();
+  /* =======================================================
+     API DATA
+  ======================================================= */
+
+  const { data: heightsRes } = useGetHeightsQuery();
+
   const heightOptions = heightsRes?.data?.map((h) => h.height) ?? [];
 
   const { data: qualificationsRes } = useGetQualificationsQuery();
+
   const { data: occupationsRes } = useGetOccupationsQuery();
+
   const { data: annualIncomesRes } = useGetAnnualIncomesQuery();
 
   const qualifications = qualificationsRes?.data ?? [];
+
   const occupations = occupationsRes?.data ?? [];
+
   const annualIncomes = annualIncomesRes?.data ?? [];
 
   const educationTypes = Array.from(
     new Set(qualifications.map((q) => q.educationType).filter(Boolean)),
   );
 
+  /* =======================================================
+     RELIGION APIs
+  ======================================================= */
+
   const [religionId, setReligionId] = useState("");
+
   const [casteId, setCasteId] = useState("");
 
   const { data: religionsRes } = useGetReligionsQuery();
+
   const { data: castesRes } = useGetCastesByReligionQuery(religionId, {
     skip: !religionId,
   });
+
   const { data: subCastesRes } = useGetSubCastesByCasteQuery(casteId, {
     skip: !casteId,
   });
+
   const { data: motherTonguesRes } = useGetMotherTonguesQuery();
 
   const religions = religionsRes?.data ?? [];
+
   const castes = castesRes?.data ?? [];
+
   const subCastes = subCastesRes?.data ?? [];
+
   const motherTongues = motherTonguesRes?.data ?? [];
 
-  // ---------- Profile creation mutation ----------
+  /* =======================================================
+     PROFILE MUTATIONS
+  ======================================================= */
+
   const [addProfile, { isLoading: isCreatingProfile }] =
     useAddProfileMutation();
+
   const [uploadProfilePhotos, { isLoading: isUploadingPhotos }] =
     useUploadProfilePhotosMutation();
+
   const isSubmitting = isCreatingProfile || isUploadingPhotos;
+
   const [submitError, setSubmitError] = useState("");
 
+  /* =======================================================
+     STEP
+  ======================================================= */
+
   const [stepIndex, setStepIndex] = useState(0);
+
   const step = STEPS[stepIndex];
 
+  const isLastStep = stepIndex === STEPS.length - 1;
+
+  const MAX_PHOTOS = 6;
+
+  /* =======================================================
+     BASIC DETAILS
+  ======================================================= */
+
   const [profileFor, setProfileFor] = useState<ProfileFor | null>(null);
+
   const [gender, setGender] = useState<Gender | null>(null);
+
   const [firstName, setFirstName] = useState("");
+
   const [lastName, setLastName] = useState("");
+
   const [birthCountry, setBirthCountry] = useState("");
+
   const [birthCity, setBirthCity] = useState("");
+
   const [maritalStatus, setMaritalStatus] = useState<MaritalStatus | null>(
     null,
   );
+
+  /* =======================================================
+     EDUCATION
+  ======================================================= */
+
   const [qualification, setQualification] = useState("");
+
   const [institution] = useState("");
+
   const [fieldOfStudy] = useState("");
 
   const [educationType, setEducationType] = useState("");
+
   const [occupation, setOccupation] = useState("");
+
   const [annualIncome, setAnnualIncome] = useState("");
 
+  /* =======================================================
+     RELIGION
+  ======================================================= */
+
   const [religion, setReligion] = useState("");
+
   const [caste, setCaste] = useState("");
+
   const [subCaste, setSubCaste] = useState("");
+
   const [dosh, setDosh] = useState("");
+
   const [motherTongue, setMotherTongue] = useState("");
 
+  /* =======================================================
+     LOCATION
+  ======================================================= */
+
   const [country, setCountry] = useState("");
+
   const [state, setState] = useState("");
+
   const [city, setCity] = useState("");
-  // ISO codes are only needed to look up child dropdown options
-  // (country-state-city requires isoCode, not the display name).
-  // The plain-name state above (country/state/city) is what still
-  // gets saved into the payload, so nothing downstream changes.
+
   const [countryIso, setCountryIso] = useState("");
+
   const [stateIso, setStateIso] = useState("");
 
+  /* =======================================================
+     FAMILY
+  ======================================================= */
+
   const [familyStatus, setFamilyStatus] = useState("");
+
   const [brothers, setBrothers] = useState("");
+
   const [marriedBrothers, setMarriedBrothers] = useState("");
+
   const [sisters, setSisters] = useState("");
+
   const [marriedSisters, setMarriedSisters] = useState("");
 
-  // NEW: was missing state entirely — the "family" step's Yes/No question
-  // was previously (incorrectly) reusing familyStatus, which is also used
-  // by the unrelated "additional" step's socio-economic Family Status field.
-  // Split out so both fields save correctly.
   const [livingWithFamily, setLivingWithFamily] = useState("");
-  // NEW: was missing state — the "Where is your family located?" input had
-  // no value/onChange at all before.
+
   const [familyBasedOutOf, setFamilyBasedOutOf] = useState("");
 
+  /* =======================================================
+     HABITS
+  ======================================================= */
+
   const [eatingHabit, setEatingHabit] = useState("");
+
   const [smokingHabit, setSmokingHabit] = useState("");
+
   const [drinkingHabit, setDrinkingHabit] = useState("");
 
+  /* =======================================================
+     HOROSCOPE
+  ======================================================= */
+
   const [birthState, setBirthState] = useState("");
-  // Same ISO-lookup pattern as the location step above, scoped to birth place.
+
   const [birthCountryIso, setBirthCountryIso] = useState("");
+
   const [birthStateIso, setBirthStateIso] = useState("");
+
   const [timeCorrection, setTimeCorrection] = useState("");
+
   const [nakshatra, setNakshatra] = useState("");
+
   const [rashi, setRashi] = useState("");
 
-  // NEW: was missing state — the horoscope step's Date of Birth input and
-  // Hour/Minute/AM-PM selects had no value/onChange at all before.
   const [horoscopeDob, setHoroscopeDob] = useState("");
-  // Defaulted to "01" (not "") since the backend requires hour >= 1 and the
-  // horoscope step is intentionally optional in the UI — this guarantees a
-  // valid value is always submitted even if the user skips this step.
+
   const [birthHour, setBirthHour] = useState("01");
+
   const [birthMinute, setBirthMinute] = useState("00");
+
   const [birthMeridiem, setBirthMeridiem] = useState("AM");
 
   const [about, setAbout] = useState("");
 
-  const goNext = () => setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
-  const goBack = () => setStepIndex((i) => Math.max(i - 1, 0));
-
-  const isLastStep = stepIndex === STEPS.length - 1;
-  const MAX_PHOTOS = 6;
-
-  // Inside your component, alongside other useState calls:
-  const [images, setImages] = useState<ProfileImage[]>([]);
-  const [mainImageId, setMainImageId] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Clean up object URLs on unmount / when images change
-  useEffect(() => {
-    return () => {
-      images.forEach((img) => URL.revokeObjectURL(img.url));
-    };
-  }, [images]);
-
-  const addFiles = (fileList: FileList | File[]) => {
-    const incoming = Array.from(fileList).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    if (!incoming.length) return;
-
-    setImages((prev) => {
-      const room = MAX_PHOTOS - prev.length;
-      if (room <= 0) return prev;
-      const toAdd = incoming.slice(0, room).map((file) => ({
-        id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        file,
-        url: URL.createObjectURL(file),
-      }));
-      const next = [...prev, ...toAdd];
-      if (!mainImageId && next.length) setMainImageId(next[0].id);
-      return next;
-    });
-  };
-
-  const removeImage = (id: string) => {
-    setImages((prev) => {
-      const next = prev.filter((img) => img.id !== id);
-      const removed = prev.find((img) => img.id === id);
-      if (removed) URL.revokeObjectURL(removed.url);
-      if (mainImageId === id) {
-        setMainImageId(next.length ? next[0].id : null);
-      }
-      return next;
-    });
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
-  };
-
-  const openFilePicker = () => fileInputRef.current?.click();
-
-  const remainingSlots = MAX_PHOTOS - images.length;
+  /* =======================================================
+     BIRTH DATE
+  ======================================================= */
 
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
@@ -284,29 +529,313 @@ const Register = () => {
   ];
 
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
+
+  const years = Array.from(
+    {
+      length: 100,
+    },
+    (_, i) => currentYear - i,
+  );
 
   const [birthDay, setBirthDay] = useState("1");
+
   const [birthMonth, setBirthMonth] = useState("January");
+
   const [birthYear, setBirthYear] = useState("2000");
 
+  /* =======================================================
+     HEIGHT
+  ======================================================= */
+
   const [height, setHeight] = useState("5 ft 7 in (170cm)");
+
   const [exactHeight, setExactHeight] = useState("");
 
-  // NEW: age was hardcoded as "25 years old" regardless of the selected
-  // birth date. Now computed from birthDay/birthMonth/birthYear.
+  /* =======================================================
+     AGE
+  ======================================================= */
+
   const computedAge = React.useMemo(() => {
     const monthIndex = months.indexOf(birthMonth);
-    if (monthIndex === -1) return 0;
+
+    if (monthIndex === -1) {
+      return 0;
+    }
+
     const dob = new Date(Number(birthYear), monthIndex, Number(birthDay));
+
     let age = currentYear - dob.getFullYear();
-    const hasHadBirthdayThisYear =
-      new Date().getMonth() > monthIndex ||
-      (new Date().getMonth() === monthIndex &&
-        new Date().getDate() >= Number(birthDay));
-    if (!hasHadBirthdayThisYear) age -= 1;
+
+    const today = new Date();
+
+    const hasHadBirthday =
+      today.getMonth() > monthIndex ||
+      (today.getMonth() === monthIndex && today.getDate() >= Number(birthDay));
+
+    if (!hasHadBirthday) {
+      age -= 1;
+    }
+
     return Math.max(age, 0);
   }, [birthDay, birthMonth, birthYear, currentYear]);
+
+  /* =======================================================
+     COUNTRY / STATE / CITY
+  ======================================================= */
+
+  const countryList = Country.getAllCountries();
+
+  const stateList = countryIso ? State.getStatesOfCountry(countryIso) : [];
+
+  const cityList =
+    countryIso && stateIso ? City.getCitiesOfState(countryIso, stateIso) : [];
+
+  const birthStateList = birthCountryIso
+    ? State.getStatesOfCountry(birthCountryIso)
+    : [];
+
+  const birthCityList =
+    birthCountryIso && birthStateIso
+      ? City.getCitiesOfState(birthCountryIso, birthStateIso)
+      : [];
+
+  /* =======================================================
+     PHOTO UPLOAD
+  ======================================================= */
+
+  const [images, setImages] = useState<ProfileImage[]>([]);
+
+  const [mainImageId, setMainImageId] = useState<string | null>(null);
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      images.forEach((img) => URL.revokeObjectURL(img.url));
+    };
+  }, [images]);
+
+  const addFiles = (fileList: FileList | File[]) => {
+    const incoming = Array.from(fileList).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+
+    if (!incoming.length) {
+      return;
+    }
+
+    setImages((prev) => {
+      const room = MAX_PHOTOS - prev.length;
+
+      if (room <= 0) {
+        return prev;
+      }
+
+      const toAdd = incoming.slice(0, room).map((file) => ({
+        id: `${file.name}-${file.size}-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}`,
+        file,
+        url: URL.createObjectURL(file),
+      }));
+
+      const next = [...prev, ...toAdd];
+
+      if (!mainImageId && next.length) {
+        setMainImageId(next[0].id);
+      }
+
+      return next;
+    });
+  };
+
+  const removeImage = (id: string) => {
+    setImages((prev) => {
+      const next = prev.filter((img) => img.id !== id);
+
+      const removed = prev.find((img) => img.id === id);
+
+      if (removed) {
+        URL.revokeObjectURL(removed.url);
+      }
+
+      if (mainImageId === id) {
+        setMainImageId(next.length ? next[0].id : null);
+      }
+
+      return next;
+    });
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+
+    setIsDragging(false);
+
+    if (e.dataTransfer.files?.length) {
+      addFiles(e.dataTransfer.files);
+    }
+  };
+
+  const openFilePicker = () => fileInputRef.current?.click();
+
+  const remainingSlots = MAX_PHOTOS - images.length;
+
+  /* =======================================================
+     OPTIONS
+  ======================================================= */
+
+  const dayOptions: SelectOption[] = days.map((day) => ({
+    value: String(day),
+    label: String(day).padStart(2, "0"),
+  }));
+
+  const monthOptions: SelectOption[] = months.map((month) => ({
+    value: month,
+    label: month,
+  }));
+
+  const yearOptions: SelectOption[] = years.map((year) => ({
+    value: String(year),
+    label: String(year),
+  }));
+
+  const heightSelectOptions: SelectOption[] = heightOptions.map((item) => ({
+    value: item,
+    label: item,
+  }));
+
+  const qualificationOptions: SelectOption[] = qualifications.map((q) => ({
+    value: q.qualification,
+    label: q.qualification,
+  }));
+
+  const educationTypeOptions: SelectOption[] = educationTypes.map((type) => ({
+    value: type,
+    label: type,
+  }));
+
+  const occupationOptions: SelectOption[] = occupations.map((o) => ({
+    value: o.occupation,
+    label: o.occupation,
+  }));
+
+  const annualIncomeOptions: SelectOption[] = annualIncomes.map((a) => ({
+    value: a.annualIncome,
+    label: a.annualIncome,
+  }));
+
+  const religionOptions: SelectOption[] = religions.map((r) => ({
+    value: r._id,
+    label: r.religion,
+  }));
+
+  const casteOptions: SelectOption[] = castes.map((c) => ({
+    value: c._id,
+    label: c.caste,
+  }));
+
+  const subCasteOptions: SelectOption[] = subCastes.map((s) => ({
+    value: s.subCaste,
+    label: s.subCaste,
+  }));
+
+  const motherTongueOptions: SelectOption[] = motherTongues.map((m) => ({
+    value: m.motherTongue,
+    label: m.motherTongue,
+  }));
+
+  const countryOptions: SelectOption[] = countryList.map((c) => ({
+    value: c.isoCode,
+    label: c.name,
+  }));
+
+  const stateOptions: SelectOption[] = stateList.map((s) => ({
+    value: s.isoCode,
+    label: s.name,
+  }));
+
+  const cityOptions: SelectOption[] = cityList.map((c) => ({
+    value: c.name,
+    label: c.name,
+  }));
+
+  const birthCountryOptions: SelectOption[] = countryList.map((c) => ({
+    value: c.isoCode,
+    label: c.name,
+  }));
+
+  const birthStateOptions: SelectOption[] = birthStateList.map((s) => ({
+    value: s.isoCode,
+    label: s.name,
+  }));
+
+  const birthCityOptions: SelectOption[] = birthCityList.map((c) => ({
+    value: c.name,
+    label: c.name,
+  }));
+
+  const hourOptions: SelectOption[] = Array.from({ length: 12 }, (_, i) =>
+    String(i + 1).padStart(2, "0"),
+  ).map((hour) => ({
+    value: hour,
+    label: hour,
+  }));
+
+  const minuteOptions: SelectOption[] = Array.from({ length: 60 }, (_, i) =>
+    String(i).padStart(2, "0"),
+  ).map((minute) => ({
+    value: minute,
+    label: minute,
+  }));
+
+  const meridiemOptions: SelectOption[] = [
+    {
+      value: "AM",
+      label: "AM",
+    },
+    {
+      value: "PM",
+      label: "PM",
+    },
+  ];
+
+  const nakshatraOptions: SelectOption[] = [
+    "Ashwini",
+    "Bharani",
+    "Krittika",
+    "Rohini",
+    "Mrigashira",
+    "Ardra",
+    "Punarvasu",
+  ].map((item) => ({
+    value: item,
+    label: item,
+  }));
+
+  const rashiOptions: SelectOption[] = [
+    "Aries (Mesh)",
+    "Taurus (Vrishabh)",
+    "Gemini (Mithun)",
+    "Cancer (Karka)",
+    "Leo (Simha)",
+    "Virgo (Kanya)",
+    "Libra (Tula)",
+    "Scorpio (Vrishchik)",
+    "Sagittarius (Dhanu)",
+    "Capricorn (Makar)",
+    "Aquarius (Kumbha)",
+    "Pisces (Meen)",
+  ].map((item) => ({
+    value: item,
+    label: item,
+  }));
+
+  /* =======================================================
+     MARITAL STATUS
+  ======================================================= */
 
   const maritalOptions = [
     "Never Married",
@@ -315,55 +844,23 @@ const Register = () => {
     "Awaiting Divorce",
   ];
 
-  // ---------- country-state-city data, derived per current selection ----------
-  const countryList = Country.getAllCountries();
-  const stateList = countryIso ? State.getStatesOfCountry(countryIso) : [];
-  const cityList =
-    countryIso && stateIso ? City.getCitiesOfState(countryIso, stateIso) : [];
+  const maritalSelectOptions: SelectOption[] = maritalOptions.map((item) => ({
+    value: item.toLowerCase().replaceAll(" ", "-"),
+    label: item,
+  }));
 
-  const birthStateList = birthCountryIso
-    ? State.getStatesOfCountry(birthCountryIso)
-    : [];
-  const birthCityList =
-    birthCountryIso && birthStateIso
-      ? City.getCitiesOfState(birthCountryIso, birthStateIso)
-      : [];
+  /* =======================================================
+     NAVIGATION
+  ======================================================= */
 
-  const OptionGroup = ({
-    title,
-    options,
-    value,
-    onChange,
-  }: {
-    title: string;
-    options: string[];
-    value: string;
-    onChange: (value: string) => void;
-  }) => (
-    <div>
-      <h2 className="mb-3 text-md font-bold text-slate-900">{title}</h2>
+  const goNext = () => setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
 
-      <div className="flex flex-wrap gap-3">
-        {options.map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => onChange(item)}
-            className={`rounded-full border px-5 py-2.5 text-sm font-semibold transition cursor-pointer ${
-              value === item
-                ? "border-rose-400 bg-rose-50 text-rose-600"
-                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-            }`}
-          >
-            {item}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+  const goBack = () => setStepIndex((i) => Math.max(i - 1, 0));
 
-  // Steps before "horoscope" now require every field on that step to be
-  // filled in. "horoscope" itself and everything after it stays optional.
+  /* =======================================================
+     VALIDATION
+  ======================================================= */
+
   const canContinue: Record<StepKey, boolean> = {
     profile: !!profileFor && !!gender,
 
@@ -396,7 +893,6 @@ const Register = () => {
 
     family: !!livingWithFamily && familyBasedOutOf.trim().length > 0,
 
-    // Optional from here on, as requested.
     horoscope: true,
     birth: true,
     habbits: true,
@@ -404,24 +900,41 @@ const Register = () => {
     profileimages: true,
   };
 
-  // ---------- Build the ProfilePayload from all step state ----------
+  /* =======================================================
+     PAYLOAD
+  ======================================================= */
+
   const buildProfilePayload = (): ProfilePayload => ({
     basicDetails: {
       profileFor: profileFor ?? "",
+
       gender: gender === "male" ? "Male" : gender === "female" ? "Female" : "",
+
       firstName,
       lastName,
-      dob: `${birthYear}-${String(months.indexOf(birthMonth) + 1).padStart(2, "0")}-${String(birthDay).padStart(2, "0")}`,
+
+      dob: `${birthYear}-${String(months.indexOf(birthMonth) + 1).padStart(
+        2,
+        "0",
+      )}-${String(birthDay).padStart(2, "0")}`,
+
       age: computedAge,
+
       height,
+
       maritalStatus: maritalStatus ?? "",
     },
+
     educationDetails: {
       highestQualification: qualification,
+
       educationType,
+
       occupation,
+
       annualIncome,
     },
+
     religionDetails: {
       religion,
       caste,
@@ -429,59 +942,69 @@ const Register = () => {
       hasDosh: dosh === "Yes",
       motherTongue,
     },
+
     locationDetails: {
       country,
       state,
       city,
     },
+
     additionalDetails: {
       classType: familyStatus,
       brothers,
       marriedBrothers,
       sisters,
       marriedSisters,
+
       livingWithFamily: livingWithFamily === "Yes",
+
       familyLocation: familyBasedOutOf,
     },
+
     horoscopeDetails: {
       birthTime: {
-        // birthHour/birthMinute default to "01"/"00" so this is always a
-        // valid, non-zero hour even when the (optional) horoscope step is
-        // skipped entirely — avoids the backend's "hour >= 1" validation error.
         hour: Number(birthHour) || 1,
+
         minute: Number(birthMinute) || 0,
+
         meridiem: birthMeridiem,
       },
+
       birthPlace: {
         country: birthCountry,
         state: birthState,
         city: birthCity,
       },
+
       starDetails: {
         nakshatra,
         rashi,
       },
     },
+
     lifestyleDetails: {
       eatingHabit,
     },
+
     aboutMe: {
       about,
-      // Not collected by any step in this form yet — defaulted.
       describeYourself: "",
       profileCreatedBy: profileFor === "self" ? "Self" : "Family",
+
       languagesISpeak: motherTongue ? [motherTongue] : [],
+
       disability: "",
       thalassemia: "",
       hivStatus: false,
     },
+
     careerDetails: {
-      // Not collected by a dedicated field yet — occupation doubles here.
       employedIn: "",
       occupation,
       organizationName: "",
       interestedInSettlingAbroad: false,
     },
+
     education: {
       aboutEducation: "",
       highestDegree: qualification,
@@ -489,6 +1012,7 @@ const Register = () => {
       underGraduation: "",
       school: institution,
     },
+
     family: {
       aboutFamily: "",
       fatherOccupation: "",
@@ -499,12 +1023,13 @@ const Register = () => {
       familyStatus,
       familyType: "",
       familyValue: "",
+
       livingWithParents: livingWithFamily === "Yes",
+
       familyBasedOutOf,
     },
+
     contactDetails: {
-      // Not collected by this form — typically comes from the OTP-verified
-      // mobile/account, not a form field. Defaulted here.
       email: "",
       alternateEmail: "",
       phoneNumber: "",
@@ -512,10 +1037,14 @@ const Register = () => {
       landlineNumber: "",
       relationshipWithBrideOrGroom: "",
     },
+
     lifestyle: {
       dietaryHabit: eatingHabit,
-      drinkingHabit,
-      smokingHabit,
+
+      drinkingHabit: drinkingHabit,
+
+      smokingHabit: smokingHabit,
+
       openToPets: false,
       ownHouse: false,
       ownCar: false,
@@ -532,19 +1061,23 @@ const Register = () => {
     },
   });
 
+  /* =======================================================
+     SUBMIT
+  ======================================================= */
+
   const handlePrimaryAction = async () => {
-    if (!canContinue[step]) return;
+    if (!canContinue[step]) {
+      return;
+    }
 
     if (isLastStep) {
       setSubmitError("");
+
       try {
-        // STEP 1 — create the profile (plain JSON, no photos).
         const payload = buildProfilePayload();
+
         await addProfile(payload).unwrap();
 
-        // STEP 2 — if any photos were added, upload them for the profile
-        // just created. A failure here doesn't roll back step 1 — the
-        // profile still exists — so it gets its own error message.
         if (images.length > 0) {
           try {
             await uploadProfilePhotos(images.map((img) => img.file)).unwrap();
@@ -553,46 +1086,59 @@ const Register = () => {
               photoErr,
               "Your profile was created, but photo upload failed. You can add photos later from your profile.",
             );
+
             setSubmitError(photoMsg);
+
             toast.error(photoMsg);
+
             return;
           }
         }
 
         toast.success("Profile created successfully!");
-        // Success — e.g. redirect to the newly created profile / dashboard.
-        // router.push("/my-profile") if using next/navigation's useRouter.
       } catch (err) {
         const message = getBackendErrorMessage(
           err,
           "Failed to create your profile. Please try again.",
         );
+
         setSubmitError(message);
+
         toast.error(message);
       }
+
       return;
     }
+
     goNext();
   };
 
+  /* =======================================================
+     JSX
+  ======================================================= */
+
   return (
-    <div className="w-full min-h-screen bg-[#FDF8F3] py-12 px-5 sm:px-8 lg:px-8 flex justify-center items-start">
+    <div className="flex min-h-screen w-full items-start justify-center bg-[#FDF8F3] px-5 py-12 sm:px-8 lg:px-8">
       <Toaster position="top-center" reverseOrder={false} />
 
       <div className="mx-auto w-full max-w-3xl rounded-3xl bg-white p-8 py-10 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)]">
-        <div className="flex items-center justify-between mb-8">
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
+        <div className="mb-8 flex items-center justify-between">
           {stepIndex > 0 ? (
             <button
               type="button"
               onClick={goBack}
-              className="flex h-9 w-9 border border-slate-200 cursor-pointer items-center justify-center rounded-full text-slate-900 hover:bg-slate-100 transition"
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-900 transition hover:bg-slate-100"
             >
               <ChevronLeft size={18} />
             </button>
           ) : (
             <Link
               href="/"
-              className="flex h-9 w-9 border border-slate-200 cursor-pointer items-center justify-center rounded-full text-slate-900 hover:bg-slate-100 transition"
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-900 transition hover:bg-slate-100"
             >
               <ChevronLeft size={18} />
             </Link>
@@ -618,33 +1164,65 @@ const Register = () => {
           </span>
         </div>
 
+        {/* =================================================
+            PROFILE
+        ================================================= */}
+
         {step === "profile" && (
-          <div key="profile" className="animate-[fadeIn_0.25s_ease-out]">
-            <h1 className="text-3xl font-extrabold text-slate-900 leading-snug mb-3 font-serif capitalize">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
+            <h1 className="mb-3 font-serif text-3xl font-extrabold leading-snug text-slate-900">
               Who is this profile for?
             </h1>
-            <p className="text-sm text-slate-500 mb-8">
+
+            <p className="mb-8 text-sm text-slate-500">
               Let us know who you&apos;re creating this profile for
             </p>
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+            <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-3">
               {(
                 [
-                  { key: "self", label: "Myself" },
-                  { key: "myson", label: "My son" },
-                  { key: "mydaughter", label: "My Daughter" },
-                  { key: "mybrother", label: "My Brother" },
-                  { key: "mysister", label: "My Sister" },
-                  { key: "myrelatives", label: "My Relatives" },
-                  { key: "myfriends", label: "My Friends" },
-                  { key: "someone-else", label: "Someone Else" },
-                ] as { key: ProfileFor; label: string }[]
+                  {
+                    key: "self",
+                    label: "Myself",
+                  },
+                  {
+                    key: "myson",
+                    label: "My son",
+                  },
+                  {
+                    key: "mydaughter",
+                    label: "My Daughter",
+                  },
+                  {
+                    key: "mybrother",
+                    label: "My Brother",
+                  },
+                  {
+                    key: "mysister",
+                    label: "My Sister",
+                  },
+                  {
+                    key: "myrelatives",
+                    label: "My Relatives",
+                  },
+                  {
+                    key: "myfriends",
+                    label: "My Friends",
+                  },
+                  {
+                    key: "someone-else",
+                    label: "Someone Else",
+                  },
+                ] as {
+                  key: ProfileFor;
+                  label: string;
+                }[]
               ).map((opt) => (
                 <button
                   key={opt.key}
                   type="button"
                   onClick={() => setProfileFor(opt.key)}
-                  className={`rounded-2xl border px-4 py-4 text-sm font-bold cursor-pointer transition ${
+                  className={`cursor-pointer rounded-2xl border px-4 py-4 text-sm font-bold transition ${
                     profileFor === opt.key
                       ? "border-rose-400 bg-rose-50 text-rose-600"
                       : "border-slate-200 text-slate-700 hover:border-slate-300"
@@ -655,10 +1233,11 @@ const Register = () => {
               ))}
             </div>
 
-            <p className="text-sm font-bold text-slate-900 mb-3 font-serif">
+            <p className="mb-3 font-serif text-sm font-bold text-slate-900">
               Select Your Gender
             </p>
-            <div className="flex gap-3 mb-10">
+
+            <div className="mb-10 flex gap-3">
               {(
                 [
                   {
@@ -684,13 +1263,14 @@ const Register = () => {
                     key={opt.key}
                     type="button"
                     onClick={() => setGender(opt.key)}
-                    className={`flex flex-1 flex-col items-center cursor-pointer gap-2 rounded-2xl border px-4 py-4 transition ${
+                    className={`flex flex-1 cursor-pointer flex-col items-center gap-2 rounded-2xl border px-4 py-4 transition ${
                       gender === opt.key
                         ? "border-rose-400 bg-rose-50 text-rose-600"
                         : "border-slate-200 text-slate-500 hover:border-slate-300"
                     }`}
                   >
                     <Icon size={24} strokeWidth={2.2} />
+
                     <span className="text-xs font-semibold text-black">
                       {opt.label}
                     </span>
@@ -701,40 +1281,49 @@ const Register = () => {
           </div>
         )}
 
+        {/* =================================================
+            NAME
+        ================================================= */}
+
         {step === "name" && (
-          <div key="name" className="animate-[fadeIn_0.25s_ease-out]">
-            <h1 className="text-3xl font-extrabold text-slate-900 leading-snug mb-3 font-serif capitalize">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
+            <h1 className="mb-3 font-serif text-3xl font-extrabold leading-snug text-slate-900">
               What&apos;s your name?
             </h1>
-            <p className="text-sm text-slate-500 mb-8">
+
+            <p className="mb-8 text-sm text-slate-500">
               This is how you&apos;ll appear across your profile
             </p>
 
-            <div className="space-y-4 mb-10">
+            <div className="mb-10 space-y-4">
               <div>
-                <label className="block text-md font-bold text-slate-900  mb-1.5">
+                <label className="mb-1.5 block text-md font-bold text-slate-900">
                   First Name
                 </label>
+
                 <input
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Enter your first name"
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-300 transition"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-rose-300"
                 />
               </div>
+
               <div>
-                <label className="block text-md font-bold text-slate-900  mb-1.5">
+                <label className="mb-1.5 block text-md font-bold text-slate-900">
                   Last Name
                 </label>
+
                 <input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Enter your last name"
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-300 transition"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-rose-300"
                 />
               </div>
+
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <label className="flex items-start gap-3 cursor-pointer">
+                <label className="flex cursor-pointer items-start gap-3">
                   <input
                     type="checkbox"
                     className="mt-1 h-4 w-4 rounded border-slate-300 text-rose-500 focus:ring-rose-500"
@@ -744,6 +1333,7 @@ const Register = () => {
                     <p className="text-sm font-medium text-slate-800">
                       Only show your last name to other users.
                     </p>
+
                     <p className="mt-1 text-xs text-slate-500">
                       If selected, you will not be able to see the full names of
                       other users.
@@ -755,142 +1345,116 @@ const Register = () => {
           </div>
         )}
 
+        {/* =================================================
+            BIRTHPLACE / DOB
+        ================================================= */}
+
         {step === "birthplace" && (
           <div className="animate-[fadeIn_0.25s_ease-out]">
-            <h1 className="text-3xl font-extrabold text-slate-900 font-serif mb-2">
+            <h1 className="mb-2 font-serif text-3xl font-extrabold text-slate-900">
               Where Were You Born?
             </h1>
 
-            <p className="text-sm text-slate-500 mb-8">
+            <p className="mb-8 text-sm text-slate-500">
               Tell us your birth date.
             </p>
 
-            <div className="grid grid-cols-3 gap-4">
-              {/* Day */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <label className="block text-md font-bold text-slate-900  mb-1.5">
+                <label className="mb-1.5 block text-md font-bold text-slate-900">
                   Day
                 </label>
 
-                <select
+                <SearchSelect
                   value={birthDay}
-                  onChange={(e) => setBirthDay(e.target.value)}
-                  className="w-full h-14 rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none focus:border-rose-400"
-                >
-                  {days.map((day) => (
-                    <option key={day} value={day}>
-                      {String(day).padStart(2, "0")}
-                    </option>
-                  ))}
-                </select>
+                  options={dayOptions}
+                  onChange={setBirthDay}
+                  placeholder="Search day..."
+                />
               </div>
 
-              {/* Month */}
               <div>
-                <label className="block text-md font-bold text-slate-900  mb-1.5">
+                <label className="mb-1.5 block text-md font-bold text-slate-900">
                   Month
                 </label>
 
-                <select
+                <SearchSelect
                   value={birthMonth}
-                  onChange={(e) => setBirthMonth(e.target.value)}
-                  className="w-full h-14 rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none focus:border-rose-400"
-                >
-                  {months.map((month) => (
-                    <option key={month} value={month}>
-                      {month}
-                    </option>
-                  ))}
-                </select>
+                  options={monthOptions}
+                  onChange={setBirthMonth}
+                  placeholder="Search month..."
+                />
               </div>
 
-              {/* Year */}
               <div>
-                <label className="block text-md font-bold text-slate-900  mb-1.5">
+                <label className="mb-1.5 block text-md font-bold text-slate-900">
                   Year
                 </label>
 
-                <select
+                <SearchSelect
                   value={birthYear}
-                  onChange={(e) => setBirthYear(e.target.value)}
-                  className="w-full h-14 rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none focus:border-rose-400"
-                >
-                  {years.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
+                  options={yearOptions}
+                  onChange={setBirthYear}
+                  placeholder="Search year..."
+                />
               </div>
             </div>
 
-            {/* Age */}
-            <div className="mt-5 rounded-full bg-linear-to-r from-rose-100 to-slate-100 px-4 py-3">
+            <div className="mt-5 rounded-full bg-gradient-to-r from-rose-100 to-slate-100 px-4 py-3">
               <p className="text-sm text-slate-700">
                 You are{" "}
                 <span className="font-semibold">{computedAge} years old</span>
               </p>
             </div>
 
-            {/* Height */}
+            {/* HEIGHT */}
+
             <div className="mt-8">
-              <label className="block text-md font-bold text-slate-900  mb-1.5">
+              <label className="mb-1.5 block text-md font-bold text-slate-900">
                 Height
               </label>
 
-              <select
+              <SearchSelect
                 value={height}
-                onChange={(e) => setHeight(e.target.value)}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none focus:border-rose-400"
-              >
-                {heightOptions.map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-
-              {/* <p className="my-3 text-center text-slate-500">Or</p> */}
-
-              {/* <select
-                value={exactHeight}
-                onChange={(e) => setExactHeight(e.target.value)}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none focus:border-rose-400"
-              >
-                <option value="">I know my height exact</option>
-                {heights.map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select> */}
+                options={heightSelectOptions}
+                onChange={setHeight}
+                placeholder={"Search height..."}
+              />
             </div>
 
-            {/* Marital Status */}
-            <div className="mt-8 mb-15">
-              <h2 className="block text-md font-bold text-slate-900  mb-1.5">
+            {/* MARITAL */}
+
+            <div className="mb-15 mt-8">
+              <h2 className="mb-1.5 block text-md font-bold text-slate-900">
                 Your Marital Status
               </h2>
 
-              <div className="flex flex-wrap gap-3">
-                {maritalOptions.map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    // @ts-ignore
-                    onClick={() => setMaritalStatus(status)}
-                    className={`rounded-full cursor-pointer border px-5 py-2.5 text-sm font-semibold transition-all ${
-                      maritalStatus === status
-                        ? "border-rose-400 bg-rose-50 text-rose-600"
-                        : "border-slate-200 text-slate-700 hover:border-slate-300"
-                    }`}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
+              <SearchSelect
+                value={
+                  maritalStatus
+                    ? (maritalOptions[
+                        maritalOptions.findIndex(
+                          (item) =>
+                            item.toLowerCase().replaceAll(" ", "-") ===
+                            maritalStatus,
+                        )
+                      ] ?? "")
+                    : ""
+                }
+                options={maritalSelectOptions}
+                onChange={(value) => setMaritalStatus(value as MaritalStatus)}
+                placeholder="Search marital status..."
+              />
             </div>
           </div>
         )}
 
+        {/* =================================================
+            EDUCATION
+        ================================================= */}
+
         {step === "education" && (
-          <div key="education" className="animate-[fadeIn_0.25s_ease-out]">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
             <h1 className="mb-3 font-serif text-3xl font-extrabold leading-snug text-slate-900">
               Tell us about your education
             </h1>
@@ -900,95 +1464,67 @@ const Register = () => {
             </p>
 
             <div className="space-y-6">
-              {/* Highest Qualification */}
               <div>
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   Highest Qualification
                 </label>
 
-                <select
+                <SearchSelect
                   value={qualification}
-                  onChange={(e) => setQualification(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-                >
-                  <option value="">Select Highest Qualification</option>
-
-                  {qualifications.map((q) => (
-                    <option key={q._id} value={q.qualification}>
-                      {q.qualification}
-                    </option>
-                  ))}
-                </select>
+                  options={qualificationOptions}
+                  onChange={setQualification}
+                  placeholder="Search qualification..."
+                />
               </div>
 
-              {/* Education Type */}
               <div>
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   Education Type
                 </label>
 
-                <select
+                <SearchSelect
                   value={educationType}
-                  onChange={(e) => setEducationType(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-                >
-                  <option value="">Select Education Type</option>
-
-                  {educationTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
+                  options={educationTypeOptions}
+                  onChange={setEducationType}
+                  placeholder="Search education type..."
+                />
               </div>
 
-              {/* Occupation */}
               <div>
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   Occupation
                 </label>
 
-                <select
+                <SearchSelect
                   value={occupation}
-                  onChange={(e) => setOccupation(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-                >
-                  <option value="">Select Occupation</option>
-
-                  {occupations.map((o) => (
-                    <option key={o._id} value={o.occupation}>
-                      {o.occupation}
-                    </option>
-                  ))}
-                </select>
+                  options={occupationOptions}
+                  onChange={setOccupation}
+                  placeholder="Search occupation..."
+                />
               </div>
 
-              {/* Annual Income */}
               <div className="mb-8">
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   Annual Income
                 </label>
 
-                <select
+                <SearchSelect
                   value={annualIncome}
-                  onChange={(e) => setAnnualIncome(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-                >
-                  <option value="">Select Annual Income</option>
-
-                  {annualIncomes.map((a) => (
-                    <option key={a._id} value={a.annualIncome}>
-                      {a.annualIncome}
-                    </option>
-                  ))}
-                </select>
+                  options={annualIncomeOptions}
+                  onChange={setAnnualIncome}
+                  placeholder="Search annual income..."
+                />
               </div>
             </div>
           </div>
         )}
 
+        {/* =================================================
+            RELIGION
+        ================================================= */}
+
         {step === "religion" && (
-          <div key="religion" className="animate-[fadeIn_0.25s_ease-out]">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
             <h1 className="mb-3 font-serif text-3xl font-extrabold leading-snug text-slate-900">
               Tell us your religion
             </h1>
@@ -998,94 +1534,77 @@ const Register = () => {
             </p>
 
             <div className="space-y-6">
-              {/* Religion */}
+              {/* RELIGION */}
+
               <div>
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   Religion
                 </label>
 
-                <select
+                <SearchSelect
                   value={religionId}
-                  onChange={(e) => {
-                    const selected = religions.find(
-                      (r) => r._id === e.target.value,
-                    );
-                    setReligionId(e.target.value);
+                  options={religionOptions}
+                  onChange={(id) => {
+                    const selected = religions.find((r) => r._id === id);
+
+                    setReligionId(id);
+
                     setReligion(selected?.religion ?? "");
-                    // Reset dependent selections since they belong to the old religion
+
                     setCasteId("");
                     setCaste("");
                     setSubCaste("");
                   }}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-                >
-                  <option value="">Select Religion</option>
-
-                  {religions.map((r) => (
-                    <option key={r._id} value={r._id}>
-                      {r.religion}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Search religion..."
+                />
               </div>
 
-              {/* Caste */}
+              {/* CASTE */}
+
               <div>
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   Caste
                 </label>
 
-                <select
+                <SearchSelect
                   value={casteId}
-                  onChange={(e) => {
-                    const selected = castes.find(
-                      (c) => c._id === e.target.value,
-                    );
-                    setCasteId(e.target.value);
+                  options={casteOptions}
+                  disabled={!religionId}
+                  onChange={(id) => {
+                    const selected = castes.find((c) => c._id === id);
+
+                    setCasteId(id);
+
                     setCaste(selected?.caste ?? "");
-                    // Reset sub-caste since it belongs to the old caste
+
                     setSubCaste("");
                   }}
-                  disabled={!religionId}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
-                >
-                  <option value="">
-                    {religionId ? "Select Caste" : "Select religion first"}
-                  </option>
-
-                  {castes.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.caste}
-                    </option>
-                  ))}
-                </select>
+                  placeholder={
+                    religionId ? "Search caste..." : "Select religion first"
+                  }
+                />
               </div>
 
-              {/* Sub Caste */}
+              {/* SUB CASTE */}
+
               <div>
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   Sub Caste
                 </label>
 
-                <select
+                <SearchSelect
                   value={subCaste}
-                  onChange={(e) => setSubCaste(e.target.value)}
+                  options={subCasteOptions}
                   disabled={!casteId}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
-                >
-                  <option value="">
-                    {casteId ? "Select Sub Caste" : "Select caste first"}
-                  </option>
-
-                  {subCastes.map((s) => (
-                    <option key={s._id} value={s.subCaste}>
-                      {s.subCaste}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSubCaste}
+                  placeholder={
+                    casteId ? "Search sub caste..." : "Select caste first"
+                  }
+                />
               </div>
 
-              {/* Dosh */}
+              {/* DOSH */}
+
               <div>
                 <h2 className="mb-3 text-md font-bold text-slate-900">
                   Do you have any dosh?
@@ -1109,32 +1628,30 @@ const Register = () => {
                 </div>
               </div>
 
-              {/* Mother Tongue */}
+              {/* MOTHER TONGUE */}
+
               <div className="mb-8">
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   What&apos;s your Mother Tongue?
                 </label>
 
-                <select
+                <SearchSelect
                   value={motherTongue}
-                  onChange={(e) => setMotherTongue(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-                >
-                  <option value="">Select Mother Tongue</option>
-
-                  {motherTongues.map((m) => (
-                    <option key={m._id} value={m.motherTongue}>
-                      {m.motherTongue}
-                    </option>
-                  ))}
-                </select>
+                  options={motherTongueOptions}
+                  onChange={setMotherTongue}
+                  placeholder="Search mother tongue..."
+                />
               </div>
             </div>
           </div>
         )}
 
+        {/* =================================================
+            LOCATION
+        ================================================= */}
+
         {step === "location" && (
-          <div key="location" className="animate-[fadeIn_0.25s_ease-out]">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
             <h1 className="mb-3 font-serif text-3xl font-extrabold leading-snug text-slate-900">
               Location Details
             </h1>
@@ -1144,96 +1661,86 @@ const Register = () => {
             </p>
 
             <div className="space-y-6">
-              {/* Country */}
+              {/* COUNTRY */}
+
               <div>
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   Your Residing Country
                 </label>
 
-                <select
+                <SearchSelect
                   value={countryIso}
-                  onChange={(e) => {
-                    const iso = e.target.value;
+                  options={countryOptions}
+                  onChange={(iso) => {
                     const selected = countryList.find((c) => c.isoCode === iso);
+
                     setCountryIso(iso);
+
                     setCountry(selected?.name ?? "");
-                    // Reset dependent selections since they belong to the old country
+
                     setStateIso("");
+
                     setState("");
+
                     setCity("");
                   }}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-                >
-                  <option value="">Select Country</option>
-
-                  {countryList.map((c) => (
-                    <option key={c.isoCode} value={c.isoCode}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Search country..."
+                />
               </div>
 
-              {/* State */}
+              {/* STATE */}
+
               <div>
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   Your Residing State
                 </label>
 
-                <select
+                <SearchSelect
                   value={stateIso}
-                  onChange={(e) => {
-                    const iso = e.target.value;
+                  options={stateOptions}
+                  disabled={!countryIso}
+                  onChange={(iso) => {
                     const selected = stateList.find((s) => s.isoCode === iso);
+
                     setStateIso(iso);
+
                     setState(selected?.name ?? "");
-                    // Reset city since it belongs to the old state
+
                     setCity("");
                   }}
-                  disabled={!countryIso}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
-                >
-                  <option value="">
-                    {countryIso ? "Select State" : "Select country first"}
-                  </option>
-
-                  {stateList.map((s) => (
-                    <option key={s.isoCode} value={s.isoCode}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder={
+                    countryIso ? "Search state..." : "Select country first"
+                  }
+                />
               </div>
 
-              {/* City */}
+              {/* CITY */}
+
               <div className="mb-8">
                 <label className="mb-2 block text-md font-bold text-slate-900">
                   Your Residing City
                 </label>
 
-                <select
+                <SearchSelect
                   value={city}
-                  onChange={(e) => setCity(e.target.value)}
+                  options={cityOptions}
                   disabled={!stateIso}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
-                >
-                  <option value="">
-                    {stateIso ? "Select City" : "Select state first"}
-                  </option>
-
-                  {cityList.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCity}
+                  placeholder={
+                    stateIso ? "Search city..." : "Select state first"
+                  }
+                />
               </div>
             </div>
           </div>
         )}
 
+        {/* =================================================
+            ADDITIONAL
+        ================================================= */}
+
         {step === "additional" && (
-          <div key="additional" className="animate-[fadeIn_0.25s_ease-out]">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
             <h1 className="mb-3 font-serif text-3xl font-extrabold text-slate-900">
               Additional Details
             </h1>
@@ -1242,7 +1749,7 @@ const Register = () => {
               Tell us a little more about your family.
             </p>
 
-            <div className="space-y-8 mb-8">
+            <div className="mb-8 space-y-8">
               <OptionGroup
                 title="Family Status"
                 options={[
@@ -1285,8 +1792,12 @@ const Register = () => {
           </div>
         )}
 
+        {/* =================================================
+            FAMILY
+        ================================================= */}
+
         {step === "family" && (
-          <div key="additional" className="animate-[fadeIn_0.25s_ease-out]">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
             <h1 className="mb-3 font-serif text-3xl font-extrabold text-slate-900">
               Family Details
             </h1>
@@ -1295,7 +1806,7 @@ const Register = () => {
               Tell us a little more about your family.
             </p>
 
-            <div className="space-y-8 mb-8">
+            <div className="mb-8 space-y-8">
               <OptionGroup
                 title="Are you currently living with your family?"
                 options={["Yes", "No"]}
@@ -1304,7 +1815,6 @@ const Register = () => {
               />
             </div>
 
-            {/* Country */}
             <div className="mb-8">
               <label className="mb-2 block text-md font-bold text-slate-900">
                 Where is your family located?
@@ -1314,15 +1824,19 @@ const Register = () => {
                 type="text"
                 value={familyBasedOutOf}
                 onChange={(e) => setFamilyBasedOutOf(e.target.value)}
-                placeholder=" Where is your family located?"
+                placeholder="Where is your family located?"
                 className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
               />
             </div>
           </div>
         )}
 
+        {/* =================================================
+            HOROSCOPE
+        ================================================= */}
+
         {step === "horoscope" && (
-          <div key="horoscope" className="animate-[fadeIn_0.25s_ease-out]">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
             <h1 className="mb-3 font-serif text-3xl font-extrabold text-slate-900">
               Horoscope Details
             </h1>
@@ -1331,91 +1845,102 @@ const Register = () => {
               Tell us your birth details to complete your horoscope information.
             </p>
 
-            {/* Birth Date */}
-            <div className="mb-8">
-              <label className="mb-2 block text-md font-bold text-slate-900">
-                Date of Birth
-              </label>
+           <div className="mb-8">
+  <label className="mb-2 block text-md font-bold text-slate-900">
+    Date of Birth
+  </label>
 
-              <input
-                type="date"
-                value={horoscopeDob}
-                onChange={(e) => setHoroscopeDob(e.target.value)}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-              />
-            </div>
+  <DatePicker
+    selected={
+      horoscopeDob
+        ? new Date(`${horoscopeDob}T00:00:00`)
+        : null
+    }
+    onChange={(date: Date | null) => {
+      if (!date) {
+        setHoroscopeDob("");
+        return;
+      }
 
-            {/* Time of Birth */}
+      const year = date.getFullYear();
+      const month = String(
+        date.getMonth() + 1,
+      ).padStart(2, "0");
+      const day = String(
+        date.getDate(),
+      ).padStart(2, "0");
+
+      setHoroscopeDob(
+        `${year}-${month}-${day}`,
+      );
+    }}
+    dateFormat="dd/MM/yyyy"
+    placeholderText="Select your date of birth"
+    showMonthDropdown
+    showYearDropdown
+    dropdownMode="select"
+    maxDate={new Date()}
+    className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+    wrapperClassName="w-full"
+    popperClassName="custom-datepicker"
+  />
+</div>
+
             <div className="mb-8">
               <label className="mb-3 block text-md font-bold text-slate-900">
                 Time of Birth
               </label>
 
-              <div className="grid grid-cols-3 gap-4">
-                {/* Hour */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-600">
                     Hour
                   </label>
 
-                  <select
+                  <SearchSelect
                     value={birthHour}
-                    onChange={(e) => setBirthHour(e.target.value)}
-                    className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400"
-                  >
-                    {["01", "02", "03", "04", "05", "06", "07", "08"].map(
-                      (hour) => (
-                        <option key={hour} value={hour}>
-                          {hour}
-                        </option>
-                      ),
-                    )}
-                  </select>
+                    options={hourOptions}
+                    onChange={setBirthHour}
+                    placeholder="Search hour..."
+                  />
                 </div>
 
-                {/* Minute */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-600">
                     Minute
                   </label>
 
-                  <select
+                  <SearchSelect
                     value={birthMinute}
-                    onChange={(e) => setBirthMinute(e.target.value)}
-                    className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400"
-                  >
-                    {["00", "01", "02", "03", "04", "05", "06", "07", "08"].map(
-                      (minute) => (
-                        <option key={minute} value={minute}>
-                          {minute}
-                        </option>
-                      ),
-                    )}
-                  </select>
+                    options={minuteOptions}
+                    onChange={setBirthMinute}
+                    placeholder="Search minute..."
+                  />
                 </div>
 
-                {/* AM / PM */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-600">
                     AM / PM
                   </label>
 
-                  <select
+                  <SearchSelect
                     value={birthMeridiem}
-                    onChange={(e) => setBirthMeridiem(e.target.value)}
-                    className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 outline-none focus:border-rose-400"
-                  >
-                    <option value="AM">AM</option>
-                    <option value="PM">PM</option>
-                  </select>
+                    options={meridiemOptions}
+                    onChange={setBirthMeridiem}
+                    placeholder="Select..."
+                  />
                 </div>
               </div>
             </div>
           </div>
         )}
 
+        {/* =================================================
+            BIRTH PLACE
+        ================================================= */}
+
         {step === "birth" && (
-          <div key="birth" className="animate-[fadeIn_0.25s_ease-out]">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
             <h1 className="mb-3 font-serif text-3xl font-extrabold text-slate-900">
               Place of Birth
             </h1>
@@ -1424,94 +1949,81 @@ const Register = () => {
               Provide your birth place details for horoscope matching.
             </p>
 
-            {/* Country */}
+            {/* COUNTRY */}
+
             <div className="mb-6">
               <label className="mb-2 block text-md font-bold text-slate-900">
                 Country of Birth
               </label>
 
-              <select
+              <SearchSelect
                 value={birthCountryIso}
-                onChange={(e) => {
-                  const iso = e.target.value;
+                options={birthCountryOptions}
+                onChange={(iso) => {
                   const selected = countryList.find((c) => c.isoCode === iso);
+
                   setBirthCountryIso(iso);
+
                   setBirthCountry(selected?.name ?? "");
-                  // Reset dependent selections since they belong to the old country
+
                   setBirthStateIso("");
+
                   setBirthState("");
+
                   setBirthCity("");
                 }}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-              >
-                <option value="">Select Country</option>
-
-                {countryList.map((c) => (
-                  <option key={c.isoCode} value={c.isoCode}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Search country..."
+              />
             </div>
 
-            {/* State */}
+            {/* STATE */}
+
             <div className="mb-6">
               <label className="mb-2 block text-md font-bold text-slate-900">
                 State of Birth
               </label>
 
-              <select
+              <SearchSelect
                 value={birthStateIso}
-                onChange={(e) => {
-                  const iso = e.target.value;
+                options={birthStateOptions}
+                disabled={!birthCountryIso}
+                onChange={(iso) => {
                   const selected = birthStateList.find(
                     (s) => s.isoCode === iso,
                   );
+
                   setBirthStateIso(iso);
+
                   setBirthState(selected?.name ?? "");
-                  // Reset city since it belongs to the old state
+
                   setBirthCity("");
                 }}
-                disabled={!birthCountryIso}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
-              >
-                <option value="">
-                  {birthCountryIso ? "Select State" : "Select country first"}
-                </option>
-
-                {birthStateList.map((s) => (
-                  <option key={s.isoCode} value={s.isoCode}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                placeholder={
+                  birthCountryIso ? "Search state..." : "Select country first"
+                }
+              />
             </div>
 
-            {/* City */}
+            {/* CITY */}
+
             <div className="mb-6">
               <label className="mb-2 block text-md font-bold text-slate-900">
                 City of Birth
               </label>
 
-              <select
+              <SearchSelect
                 value={birthCity}
-                onChange={(e) => setBirthCity(e.target.value)}
+                options={birthCityOptions}
                 disabled={!birthStateIso}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-400"
-              >
-                <option value="">
-                  {birthStateIso ? "Select City" : "Select state first"}
-                </option>
-
-                {birthCityList.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setBirthCity}
+                placeholder={
+                  birthStateIso ? "Search city..." : "Select state first"
+                }
+              />
             </div>
 
-            {/* Time Correction */}
+            {/* TIME CORRECTION */}
+
             <div className="mb-8">
               <label className="mb-2 block text-md font-bold text-slate-900">
                 Time Correction (Optional)
@@ -1536,69 +2048,44 @@ const Register = () => {
               Select your Nakshatra and Rashi.
             </p>
 
-            {/* Nakshatra */}
+            {/* NAKSHATRA */}
+
             <div className="mb-6">
               <label className="mb-2 block text-md font-bold text-slate-900">
                 Nakshatra
               </label>
 
-              <select
+              <SearchSelect
                 value={nakshatra}
-                onChange={(e) => setNakshatra(e.target.value)}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-              >
-                <option value="">Select Nakshatra</option>
-
-                {[
-                  "Ashwini",
-                  "Bharani",
-                  "Krittika",
-                  "Rohini",
-                  "Mrigashira",
-                  "Ardra",
-                  "Punarvasu",
-                ].map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
+                options={nakshatraOptions}
+                onChange={setNakshatra}
+                placeholder="Search nakshatra..."
+              />
             </div>
 
-            {/* Rashi */}
+            {/* RASHI */}
+
             <div className="mb-8">
               <label className="mb-2 block text-md font-bold text-slate-900">
                 Rashi
               </label>
 
-              <select
+              <SearchSelect
                 value={rashi}
-                onChange={(e) => setRashi(e.target.value)}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
-              >
-                <option value="">Select Rashi</option>
-
-                {[
-                  "Aries (Mesh)",
-                  "Taurus (Vrishabh)",
-                  "Gemini (Mithun)",
-                  "Cancer (Karka)",
-                  "Leo (Simha)",
-                  "Virgo (Kanya)",
-                  "Libra (Tula)",
-                  "Scorpio (Vrishchik)",
-                  "Sagittarius (Dhanu)",
-                  "Capricorn (Makar)",
-                  "Aquarius (Kumbha)",
-                  "Pisces (Meen)",
-                ].map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
+                options={rashiOptions}
+                onChange={setRashi}
+                placeholder="Search rashi..."
+              />
             </div>
           </div>
         )}
 
+        {/* =================================================
+            HABITS
+        ================================================= */}
+
         {step === "habbits" && (
-          <div key="habbits" className="animate-[fadeIn_0.25s_ease-out]">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
             <h1 className="mb-3 font-serif text-3xl font-extrabold text-slate-900">
               Habits Details
             </h1>
@@ -1607,7 +2094,7 @@ const Register = () => {
               Tell us about your lifestyle preferences.
             </p>
 
-            <div className="space-y-8 mb-8">
+            <div className="mb-8 space-y-8">
               <OptionGroup
                 title="Eating Habit"
                 options={["Vegetarian", "Non Vegetarian", "Eggitarian"]}
@@ -1637,8 +2124,12 @@ const Register = () => {
           </div>
         )}
 
+        {/* =================================================
+            ABOUT
+        ================================================= */}
+
         {step === "About" && (
-          <div key="habbits" className="animate-[fadeIn_0.25s_ease-out]">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
             <h1 className="mb-3 font-serif text-3xl font-extrabold text-slate-900">
               About me
             </h1>
@@ -1647,10 +2138,10 @@ const Register = () => {
               Lastly, write your bio
             </p>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-8">
+            <div className="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <small>
                 Talk about yourself, your interests and goals to help others get
-                to know you better{" "}
+                to know you better
               </small>
             </div>
 
@@ -1658,14 +2149,18 @@ const Register = () => {
               <textarea
                 value={about}
                 onChange={(e) => setAbout(e.target.value)}
-                className="h-40 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base outline-none transition focus:border-rose-400"
+                className="h-40 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base outline-none transition focus:border-rose-400"
               />
             </div>
           </div>
         )}
 
+        {/* =================================================
+            PROFILE IMAGES
+        ================================================= */}
+
         {step === "profileimages" && (
-          <div key="profileimages" className="animate-[fadeIn_0.25s_ease-out]">
+          <div className="animate-[fadeIn_0.25s_ease-out]">
             <h1 className="mb-3 font-serif text-3xl font-extrabold text-slate-900">
               Add your photos
             </h1>
@@ -1681,16 +2176,19 @@ const Register = () => {
               multiple
               className="hidden"
               onChange={(e) => {
-                if (e.target.files) addFiles(e.target.files);
+                if (e.target.files) {
+                  addFiles(e.target.files);
+                }
+
                 e.target.value = "";
               }}
             />
 
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="mb-4 grid grid-cols-3 gap-3">
               {images.map((img, index) => (
                 <div
                   key={img.id}
-                  className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 group"
+                  className="group relative aspect-square overflow-hidden rounded-2xl border border-slate-200"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -1703,7 +2201,7 @@ const Register = () => {
                     type="button"
                     onClick={() => removeImage(img.id)}
                     aria-label="Remove photo"
-                    className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition"
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80"
                   >
                     <X size={13} />
                   </button>
@@ -1721,59 +2219,62 @@ const Register = () => {
                       size={11}
                       fill={mainImageId === img.id ? "white" : "none"}
                     />
+
                     {mainImageId === img.id ? "Main" : "Set main"}
                   </button>
 
                   {index === 0 && mainImageId === img.id && (
-                    <span className="absolute top-1.5 left-1.5 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                    <span className="absolute left-1.5 top-1.5 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-rose-600">
                       Cover
                     </span>
                   )}
                 </div>
               ))}
 
-              {Array.from({ length: Math.max(remainingSlots, 0) }).map(
-                (_, i) => (
-                  <button
-                    key={`empty-${i}`}
-                    type="button"
-                    onClick={openFilePicker}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setIsDragging(true);
-                    }}
-                    onDragLeave={() => setIsDragging(false)}
-                    // @ts-ignore
-                    onDrop={handleDrop}
-                    className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed transition ${
-                      isDragging
-                        ? "border-rose-400 bg-rose-50"
-                        : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                    }`}
-                  >
-                    {i === 0 && images.length === 0 ? (
-                      <>
-                        <Camera size={20} className="text-slate-400" />
-                        <span className="text-[11px] font-semibold text-slate-500">
-                          Add photo
-                        </span>
-                      </>
-                    ) : (
-                      <Plus size={18} className="text-slate-300" />
-                    )}
-                  </button>
-                ),
-              )}
+              {Array.from({
+                length: Math.max(remainingSlots, 0),
+              }).map((_, i) => (
+                <button
+                  key={`empty-${i}`}
+                  type="button"
+                  onClick={openFilePicker}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleDrop}
+                  className={`flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed transition ${
+                    isDragging
+                      ? "border-rose-400 bg-rose-50"
+                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  {i === 0 && images.length === 0 ? (
+                    <>
+                      <Camera size={20} className="text-slate-400" />
+
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        Add photo
+                      </span>
+                    </>
+                  ) : (
+                    <Plus size={18} className="text-slate-300" />
+                  )}
+                </button>
+              ))}
             </div>
 
-            <p className="text-xs text-slate-400 mb-8">
+            <p className="mb-8 text-xs text-slate-400">
               {images.length}/{MAX_PHOTOS} photos added · Drag to reorder coming
               soon
             </p>
-
-            <div className="mb-8" />
           </div>
         )}
+
+        {/* =================================================
+            ERROR
+        ================================================= */}
 
         {submitError && (
           <p className="mb-4 text-sm font-medium text-rose-600">
@@ -1781,11 +2282,15 @@ const Register = () => {
           </p>
         )}
 
+        {/* =================================================
+            NEXT / SUBMIT
+        ================================================= */}
+
         <ThemeBtnOne
           type="button"
           disabled={!canContinue[step] || (isLastStep && isSubmitting)}
           onClick={handlePrimaryAction}
-          className="w-full bg-rose-500 text-white py-4 px-4 rounded-full font-serif cursor-pointer"
+          className="w-full cursor-pointer rounded-full bg-rose-500 px-4 py-4 font-serif text-white"
           text={
             isLastStep
               ? isCreatingProfile
@@ -1795,7 +2300,7 @@ const Register = () => {
                   : "Submit"
               : "Next"
           }
-        ></ThemeBtnOne>
+        />
       </div>
 
       <style jsx global>{`
@@ -1804,6 +2309,7 @@ const Register = () => {
             opacity: 0;
             transform: translateY(4px);
           }
+
           to {
             opacity: 1;
             transform: translateY(0);

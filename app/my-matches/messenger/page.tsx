@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import MatchSidebar from "@/app/components/MatchSidebar";
 import Messenger from "./components/Messenger";
+import MobileNavbar from "@/app/components/MobileNavbar";
 
 export const metadata: Metadata = {
   title: "My Chat | Your Website Name",
@@ -15,6 +16,7 @@ const ChatScreenPage = () => {
           <div className="grid grid-cols-1 gap-5 md:grid-cols-[300px_1fr]">
             <MatchSidebar />
             <Messenger />
+            <MobileNavbar />
           </div>
         </div>
       </section>

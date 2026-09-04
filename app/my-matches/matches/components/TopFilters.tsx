@@ -14,9 +14,12 @@ import {
   Ruler,
   Heart,
   Moon,
+  ShieldCheck,
+  Sparkles,
+  MapPin,
   type LucideIcon,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Country } from "country-state-city";
 import ThemeBtnOne from "@/app/components/ThemeBtnOne";
 
@@ -96,6 +99,16 @@ const createEmptyFilters = (): Record<BrowseCategoryKey, string[]> => ({
   maritalStatus: [],
   manglik: [],
 });
+
+// Quick filters shown as pill chips next to the "Filters" button — each maps
+// to its own boolean query param on /my-matches/matches (e.g. ?verified=true).
+const QUICK_FILTERS = [
+  { key: "verified", label: "Verified", icon: ShieldCheck },
+  { key: "justJoined", label: "Just Joined", icon: Sparkles },
+  { key: "nearby", label: "Nearby", icon: MapPin },
+] as const;
+
+type QuickFilterKey = (typeof QUICK_FILTERS)[number]["key"];
 
 function RefineMatchesSheet({
   open,
@@ -391,6 +404,30 @@ function RefineMatchesSheet({
 
 const TopFilters = () => {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // A quick filter is "active" when its param is present in the URL as "true".
+  const activeQuickFilters = useMemo(() => {
+    const set = new Set<QuickFilterKey>();
+    QUICK_FILTERS.forEach((f) => {
+      if (searchParams.get(f.key) === "true") set.add(f.key);
+    });
+    return set;
+  }, [searchParams]);
+
+  // Toggling a chip adds/removes its param and re-navigates to the matches
+  // page, keeping whatever other filters are already in the URL.
+  const toggleQuickFilter = (key: QuickFilterKey) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (params.get(key) === "true") {
+      params.delete(key);
+    } else {
+      params.set(key, "true");
+    }
+    const query = params.toString();
+    router.push(query ? `/my-matches/matches?${query}` : "/my-matches/matches");
+  };
 
   return (
     <>
@@ -398,10 +435,30 @@ const TopFilters = () => {
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
-          className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-rose-300"
+          className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700"
         >
           <SlidersHorizontal size={15} /> Filters
         </button>
+
+        {QUICK_FILTERS.map((filter) => {
+          const Icon = filter.icon;
+          const isActive = activeQuickFilters.has(filter.key);
+          return (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => toggleQuickFilter(filter.key)}
+              className={`flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition ${
+                isActive
+                  ? "border-rose-300 bg-rose-50 text-rose-600"
+                  : "border-stone-300 bg-white text-slate-700 hover:border-rose-300"
+              }`}
+            >
+              {isActive ? <X size={15} /> : <Icon size={15} />}
+              {filter.label}
+            </button>
+          );
+        })}
       </div>
 
       <RefineMatchesSheet

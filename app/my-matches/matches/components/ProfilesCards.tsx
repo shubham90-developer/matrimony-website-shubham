@@ -2,17 +2,21 @@
 
 import ThemeBtnOne from "@/app/components/ThemeBtnOne";
 import {
-  ChevronLeft,
-  ChevronRight,
+  BadgeCheck,
+  Circle,
   GraduationCap,
-  Languages,
+  Heart,
+  Images,
   Loader2,
   Mail,
+  MapPin,
   MessageCircle,
+  Ruler,
   Send,
   Sparkles,
   Star,
   User,
+  Users,
   X,
 } from "lucide-react";
 import Image from "next/image";
@@ -31,6 +35,7 @@ import { useAddToShortlistMutation } from "@/Redux/shortlistApi";
 import { useAddToIgnoreMutation } from "@/Redux/ignoreApi";
 
 interface Profile {
+  matchPercent: any;
   id: string;
   userId: string;
   name: string;
@@ -96,7 +101,7 @@ const toCardProfile = (apiProfile: ApiProfile): Profile => {
     userId: _id,
     name: `${basicDetails?.firstName ?? ""} ${basicDetails?.lastName ?? ""}`.trim(),
     age: basicDetails?.age ?? 0,
-    status: "Active Today",
+    status: "Verified",
     tag: isRecentlyJoined ? "Just Joined" : undefined,
     height: basicDetails?.height ?? "",
     city: locationDetails?.city ?? "",
@@ -242,132 +247,34 @@ function UpgradeModal({ profile, onClose }: UpgradeModalProps) {
 
 /* ---------------- Lightbox / Popup ---------------- */
 
-interface ImageLightboxProps {
-  images: string[];
-  index: number;
-  onClose: () => void;
-  onChange: (index: number) => void;
-}
-
-function ImageLightbox({
-  images,
-  index,
-  onClose,
-  onChange,
-}: ImageLightboxProps) {
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowLeft")
-        onChange((index - 1 + images.length) % images.length);
-      if (e.key === "ArrowRight") onChange((index + 1) % images.length);
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [index, images.length, onChange, onClose]);
-
-  const goPrev = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onChange((index - 1 + images.length) % images.length);
-  };
-
-  const goNext = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onChange((index + 1) % images.length);
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        className="relative w-full max-w-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-2 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="flex cursor-pointer items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/20"
-          >
-            <X size={16} /> Close
-          </button>
-        </div>
-
-        <div className="relative h-[70vh] w-full overflow-hidden rounded-2xl bg-slate-900 sm:h-[75vh]">
-          <Image
-            src={images[index]}
-            alt={`photo ${index + 1}`}
-            fill
-            className="object-contain"
-            sizes="(max-width: 768px) 100vw, 640px"
-            priority
-          />
-
-          {images.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={goPrev}
-                aria-label="Previous photo"
-                className="absolute left-3 cursor-pointer top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition hover:bg-black/70"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button
-                type="button"
-                onClick={goNext}
-                aria-label="Next photo"
-                className="absolute right-3 cursor-pointer top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition hover:bg-black/70"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </>
-          )}
-
-          <span className="absolute bottom-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white">
-            {index + 1} / {images.length}
-          </span>
-        </div>
-
-        {images.length > 1 && (
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {images.map((src, i) => (
-              <button
-                type="button"
-                key={src + i}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChange(i);
-                }}
-                aria-label={`View photo ${i + 1}`}
-                className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition ${
-                  i === index
-                    ? "border-rose-500"
-                    : "border-transparent opacity-70 hover:opacity-100"
-                }`}
-              >
-                <Image
-                  src={src}
-                  alt={`thumb ${i + 1}`}
-                  fill
-                  sizes="64px"
-                  className="object-cover"
-                />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /* ---------------- Profile Card ---------------- */
+
+// NOTE on data used by this version that wasn't in your original Profile fields:
+//   p.verified?: boolean       -> shows the green "Verified" badge when true
+//   p.matchPercent?: number    -> shows the pink match-% badge when present (e.g. 73)
+// If your Profile type doesn't have these yet, add them (or rename to whatever
+// your API already returns) — the badges just won't render until the field exists.
+//
+// Also make sure `lucide-react` import includes: Send, User, GraduationCap,
+// Languages, Loader2, Images, ShieldCheck, Heart
+
+// NOTE on data used by this version that wasn't in your original Profile fields:
+//   p.verified?: boolean       -> shows the green "Verified" badge when true
+//   p.matchPercent?: number    -> shows the pink match-% badge when present (e.g. 73)
+// If your Profile type doesn't have these yet, add them (or rename to whatever
+// your API already returns) — the badges just won't render until the field exists.
+//
+// Also make sure `lucide-react` import includes: Send, User, GraduationCap,
+// Languages, Loader2, Images, ShieldCheck, Heart
+
+// NOTE on data used by this version that wasn't in your original Profile fields:
+//   p.verified?: boolean       -> shows the green "Verified" badge when true
+//   p.matchPercent?: number    -> shows the pink match-% badge when present (e.g. 73)
+// If your Profile type doesn't have these yet, add them (or rename to whatever
+// your API already returns) — the badges just won't render until the field exists.
+//
+// Also make sure `lucide-react` import includes: Send, User, GraduationCap,
+// Languages, Loader2, Images, ShieldCheck, Heart
 
 function ProfileCard({
   p,
@@ -377,8 +284,6 @@ function ProfileCard({
   onHide: (userId: string) => void;
 }) {
   const router = useRouter();
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const [sendInterest, { isLoading: interestLoading }] =
@@ -396,14 +301,6 @@ function ProfileCard({
 
   const images = p.images?.length ? p.images : [FALLBACK_IMAGE];
   const isJustJoined = p.tag === "Just Joined";
-
-  const openLightbox = (e: React.MouseEvent) => {
-    // Prevent the parent <Link> from navigating when the photo is clicked
-    e.preventDefault();
-    e.stopPropagation();
-    setActiveIndex(0);
-    setLightboxOpen(true);
-  };
 
   const handleAction = async (
     e: React.MouseEvent,
@@ -453,122 +350,153 @@ function ProfileCard({
     <>
       <Link
         href={`/my-matches/details?id=${encodeURIComponent(p.id)}`}
-        className="block overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:shadow-lg"
+        className="group relative block h-150 w-full overflow-hidden rounded-[28px] border border-stone-200/70 bg-stone-900 shadow-[0_1px_2px_rgba(60,40,30,0.06),0_14px_28px_-18px_rgba(60,40,30,0.4)] transition-shadow duration-300 hover:shadow-[0_1px_2px_rgba(60,40,30,0.08),0_22px_38px_-18px_rgba(60,40,30,0.5)] sm:h-160"
       >
-        {/* Card */}
-        <div className="flex flex-col sm:flex-row">
-          {/* Photo */}
-          <button
-            type="button"
-            onClick={openLightbox}
-            aria-label={`View ${p.name}'s photos`}
-            className="group cursor-pointer relative h-72 w-full overflow-hidden bg-linear-to-b from-slate-700 to-slate-900 sm:h-56 sm:w-44 sm:shrink-0"
-          >
-            <Image
-              src={images[0]}
-              alt={p.name}
-              fill
-              sizes="(max-width:640px) 100vw, 176px"
-              className="object-cover transition duration-300 group-hover:scale-105"
-            />
+        {/* Photo — fills the entire card as the background. Clicking anywhere
+            on the card, including the photo, follows this Link to the details page. */}
+        <Image
+          src={images[0]}
+          alt={p.name}
+          fill
+          sizes="(max-width:640px) 100vw, 400px"
+          className="absolute inset-0 z-0 object-cover transition duration-500 group-hover:scale-105"
+        />
 
-            {images.length > 1 && (
-              <span className="absolute bottom-3 right-3 rounded-full bg-black/60 px-2 py-1 text-xs font-semibold text-white">
-                +{images.length - 1}
-              </span>
-            )}
-          </button>
+        {/* Scrim: light at top so badges stay legible, strong at bottom for text + buttons */}
+        <div className="pointer-events-none absolute inset-0 z-10 bg-linear-to-t from-black/92 via-black/50 to-black/10" />
 
-          {/* Info */}
-          <div className="relative min-w-0 flex-1 p-4 sm:p-5">
-            {p.tag && (
-              <span className="absolute right-4 top-4 flex items-center gap-1 rounded-md bg-stone-100 px-2.5 py-1 text-[11px] sm:text-xs font-bold italic text-slate-800">
+        {/* Top row: verified + status on the left, photo count on the right */}
+        <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-3.5">
+          <div className="flex flex-col items-start gap-2">
+            {p.tag ? (
+              <span className="flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold italic text-slate-800 backdrop-blur">
                 <Send size={12} />
                 {p.tag}
               </span>
+            ) : (
+              <span
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold backdrop-blur ${
+                  p.status === "Verified"
+                    ? "bg-teal-500/90 text-white"
+                    : p.status === "Online"
+                      ? "bg-emerald-500/90 text-white"
+                      : p.status === "Just Joined"
+                        ? "bg-purple-500/90 text-white"
+                        : "bg-black/45 text-white"
+                }`}
+              >
+                {p.status === "Verified" && (
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                )}
+
+                {p.status === "Online" && (
+                  <span className="relative flex h-3.5 w-3.5 items-center justify-center">
+                    <span className="absolute h-3 w-3 animate-ping rounded-full bg-white/60" />
+                    <Circle className="relative h-2.5 w-2.5 fill-white text-white" />
+                  </span>
+                )}
+
+                {p.status === "Just Joined" && (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+
+                {p.status}
+              </span>
             )}
+          </div>
 
-            <p
-              className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${
-                p.status === "Online"
-                  ? "bg-emerald-100 text-emerald-600"
-                  : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {p.status === "Online" && (
-                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-              )}
-              {p.status}
-            </p>
-
-            <h3 className="mt-2 font-serif text-xl font-bold text-slate-900 sm:text-2xl">
-              {p.name}, {p.age}
-            </h3>
-
-            <p className="mt-2 text-sm text-stone-500 font-semibold">
-              {p.height} • {p.city} • {p.community}
-            </p>
-
-            <div className="mt-3 space-y-2">
-              <p className="flex items-start gap-2 text-sm text-stone-600 font-semibold">
-                <User size={15} className="mt-0.5 shrink-0 text-stone-400" />
-                <span className="wrap-break-word">
-                  {p.job} • {p.income}
-                </span>
-              </p>
-
-              <p className="flex items-start gap-2 text-sm text-stone-600 font-semibold">
-                <GraduationCap
-                  size={15}
-                  className="mt-0.5 shrink-0 text-stone-400"
-                />
-                <span className="wrap-break-word">
-                  {p.edu} • {p.marital}
-                </span>
-              </p>
-
-              <p className="flex items-start gap-2 text-sm text-stone-600 font-semibold">
-                <Languages
-                  size={15}
-                  className="mt-0.5 shrink-0 text-stone-400"
-                />
-                <span className="wrap-break-word">
-                  {p.religion} • {p.caste} • {p.subcaste}
-                </span>
-              </p>
-            </div>
+          <div className="flex flex-col items-end gap-2">
+            {images.length > 1 && (
+              <span className="flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur">
+                <Images size={12} />
+                1/{images.length}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="grid grid-cols-4 divide-x divide-y divide-rose-200/60 bg-rose-50 text-rose-600 sm:grid-cols-4 sm:divide-y-0">
-          {ACTIONS.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              disabled={actionLoading[action.key]}
-              onClick={(e) => handleAction(e, action)}
-              className="flex cursor-pointer items-center justify-center gap-2 py-3 text-xs font-semibold transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-            >
-              {actionLoading[action.key] ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <action.icon size={16} />
-              )}
-              <span>{action.label}</span>
-            </button>
-          ))}
+        {/* Bottom block: name, meta, info pills, and the action bar — all overlaid on the photo */}
+        <div className="absolute inset-x-0 bottom-0 z-20 p-4 sm:p-5">
+          {/* Floating match-% badge, right side, straddling the name row like the reference */}
+          <div className="absolute top-1 right-4 z-30 flex h-12 w-12 flex-col items-center justify-center rounded-xl border-2 border-white/30 bg-rose-500 text-white shadow-lg">
+            <Heart size={15} className="fill-white" />
+
+            <span className="text-xs font-bold leading-tight">
+              {typeof p.matchPercent === "number" ? p.matchPercent : 0}%
+            </span>
+          </div>
+
+          <h3 className="flex max-w-[calc(100%-4.5rem)] items-center gap-1.5 font-serif text-2xl font-bold text-white sm:text-[26px]">
+            <span>
+              {p.name}, {p.age}
+            </span>
+
+            {p.status === "Verified" && (
+              <BadgeCheck
+                size={21}
+                className="shrink-0 fill-blue-500 text-white"
+              />
+            )}
+          </h3>
+
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
+              <Ruler size={12} className="text-rose-300" />
+              {p.height}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
+              <MapPin size={12} className="text-rose-300" />
+              {p.city}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
+              <Users size={12} className="text-rose-300" />
+              {p.community}
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
+              <User size={13} className="shrink-0 text-rose-300" />
+              <span className="wrap-break-word">
+                {p.job} · {p.income}
+              </span>
+            </span>
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
+              <GraduationCap size={13} className="shrink-0 text-rose-300" />
+              <span className="wrap-break-word">
+                {p.edu} · {p.marital}
+              </span>
+            </span>
+          </div>
+
+          {/* Actions: icon on top, label below, primary action (Interest) filled */}
+          <div className="relative z-30 mt-4 flex gap-2">
+            {ACTIONS.map((action) => {
+              const isPrimary = action.key === "interest";
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  disabled={actionLoading[action.key]}
+                  onClick={(e) => handleAction(e, action)}
+                  className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl py-2.5 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    isPrimary
+                      ? "bg-rose-600 text-white hover:bg-rose-700"
+                      : "bg-white/15 text-white backdrop-blur hover:bg-white/25"
+                  }`}
+                >
+                  {actionLoading[action.key] ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <action.icon size={16} />
+                  )}
+                  <span>{action.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </Link>
-
-      {lightboxOpen && (
-        <ImageLightbox
-          images={images}
-          index={activeIndex}
-          onChange={setActiveIndex}
-          onClose={() => setLightboxOpen(false)}
-        />
-      )}
 
       {upgradeOpen && (
         <UpgradeModal profile={p} onClose={() => setUpgradeOpen(false)} />
@@ -623,12 +551,65 @@ const ProfilesCards = () => {
   };
 
   const isLoading = myProfileLoading || feedLoading;
+  // Skeleton for the redesigned ProfileCard — same shape/height so the grid
+  // doesn't jump when real cards swap in.
+  function ProfileCardSkeleton() {
+    return (
+      <div className="relative h-150 w-full animate-pulse overflow-hidden rounded-[28px] border border-stone-200 bg-stone-100 sm:h-160">
+        {/* Photo area */}
+        <div className="absolute inset-0 bg-stone-200" />
+
+        {/* Top row: verified/status chip placeholders — photo count placeholder */}
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3.5">
+          <div className="h-7 w-24 rounded-full bg-stone-300/80" />
+          <div className="h-7 w-12 rounded-full bg-stone-300/80" />
+        </div>
+
+        {/* Bottom block placeholders */}
+        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+          {/* Floating match-% circle placeholder */}
+          <div className="absolute -top-7 right-4 h-16 w-16 rounded-full border-2 border-stone-100 bg-stone-300/80" />
+
+          <div className="h-7 w-40 rounded-md bg-stone-300/80" />
+
+          <div className="mt-2 flex gap-1.5">
+            <div className="h-6 w-20 rounded-full bg-stone-300/70" />
+            <div className="h-6 w-28 rounded-full bg-stone-300/70" />
+            <div className="h-6 w-24 rounded-full bg-stone-300/70" />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <div className="h-7 w-32 rounded-full bg-stone-300/70" />
+            <div className="h-7 w-36 rounded-full bg-stone-300/70" />
+            <div className="h-7 w-40 rounded-full bg-stone-300/70" />
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <div className="h-14 flex-1 rounded-xl bg-stone-300/70" />
+            <div className="h-14 flex-1 rounded-xl bg-stone-300/70" />
+            <div className="h-14 flex-1 rounded-xl bg-stone-300/70" />
+            <div className="h-14 flex-1 rounded-xl bg-stone-300/70" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
-      <div className="mt-5 flex items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white py-16 text-sm text-stone-500">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading profiles...
+      <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <ProfileCardSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
+  if (isLoading) {
+    return (
+      <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <ProfileCardSkeleton key={i} />
+        ))}
       </div>
     );
   }
@@ -650,7 +631,7 @@ const ProfilesCards = () => {
   }
 
   return (
-    <div className="mt-5 space-y-5">
+    <div className="mt-5 space-y-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
       <Toaster position="top-center" reverseOrder={false} />
       {profiles.map((p) => (
         <ProfileCard key={p.id} p={p} onHide={handleHide} />

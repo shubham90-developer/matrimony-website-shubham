@@ -23,7 +23,6 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Country } from "country-state-city";
-import ThemeBtnOne from "./ThemeBtnOne";
 import Logo from "./Logo";
 
 import { useGetReligionsQuery } from "@/Redux/religionApi";
@@ -32,6 +31,8 @@ import { useGetAnnualIncomesQuery } from "@/Redux/annualIncomeApi";
 import { useGetQualificationsQuery } from "@/Redux/qualificationApi";
 import { useGetOccupationsQuery } from "@/Redux/occupationApi";
 import { useGetHeightsQuery } from "@/Redux/heightApi";
+import Image from "next/image";
+import { useGetMyProfileQuery } from "@/Redux/profileApi";
 
 // ---------- Browse categories ----------
 // Labels/icons are UI-only. Options for religion, mother tongue, annual
@@ -130,7 +131,7 @@ const SEARCH_LINKS: SearchLink[] = [
   },
   {
     label: "Search by ID",
-    desc: "Find a profile using their Tuz Maz Jamla ID",
+    desc: "Find a profile using their Tuza Maza Jamla.com ID",
     url: "/search-by-id",
   },
 ];
@@ -412,11 +413,16 @@ const Header = () => {
     </div>
   );
 
+  const { data } = useGetMyProfileQuery();
+
+  console.log("data", data);
   return (
     <header className="relative z-50 w-full border-b border-rose-100 bg-white shadow-xs">
       <div className="mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:h-18 lg:px-8">
         {/* Logo */}
-        <Logo />
+        <Link href="/">
+          <Logo />
+        </Link>
 
         {/* Desktop nav */}
         <div ref={navRef} className="hidden items-center gap-1 lg:flex">
@@ -594,7 +600,15 @@ const Header = () => {
               aria-label="My Profile"
               className="flex items-center justify-center text-rose-600 hover:text-rose-700 transition-colors cursor-pointer"
             >
-              <UserCircle className="h-8 w-8" />
+              {/* <UserCircle className="h-8 w-8" /> */}
+              <Image
+                src={data?.data?.photos?.[0] || "/images/default-profile.png"}
+                alt="Profile"
+                width={50}
+                height={50}
+                className="h-12 w-12 rounded-full object-cover  border-rose-600 border-2"
+                priority
+              />
             </Link>
           ) : (
             <Link
@@ -614,7 +628,14 @@ const Header = () => {
               aria-label="My Profile"
               className="flex items-center justify-center text-rose-600"
             >
-              <UserCircle className="h-6 w-6" />
+              <Image
+                src={data?.data?.photos?.[0] || "/images/default-profile.png"}
+                alt="Profile"
+                width={50}
+                height={50}
+                className="h-10 w-10 rounded-full object-cover  border-rose-600 border-2"
+                priority
+              />
             </Link>
           ) : (
             <Link
@@ -646,7 +667,9 @@ const Header = () => {
           <div className="absolute right-0 top-0 flex h-full w-[85%] max-w-sm flex-col bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               {/* Logo */}
-              <Logo />
+              <Link href="/">
+                <Logo />
+              </Link>
               <button
                 onClick={() => setMobileOpen(false)}
                 aria-label="Close menu"
@@ -731,6 +754,7 @@ const Header = () => {
                                   {data.items.map((item) => (
                                     <label
                                       key={item.id}
+                                      onClick={() => setMobileOpen(false)}
                                       className="flex cursor-pointer items-center gap-2 py-1 text-[12px] text-slate-600"
                                     >
                                       <input
@@ -772,6 +796,7 @@ const Header = () => {
                     <Link
                       key={s.label}
                       href={s.url}
+                      onClick={() => setMobileOpen(false)}
                       className="text-[12px] text-slate-600 hover:text-rose-600 border-b border-dashed border-gray-200 py-2"
                     >
                       {s.label}
@@ -783,6 +808,7 @@ const Header = () => {
               {/* Help */}
               <Link
                 href="/help"
+                onClick={() => setMobileOpen(false)}
                 className="block px-3 py-3.5 text-[14px] font-semibold text-slate-800 font-serif tracking-wider cursor-pointer"
               >
                 Help

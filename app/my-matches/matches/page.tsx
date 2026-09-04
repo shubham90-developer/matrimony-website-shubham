@@ -1,7 +1,7 @@
-import { Suspense } from "react";
 import { Metadata } from "next";
 import MyMatches from "./components/MyMatches";
 import MatchSidebar from "@/app/components/MatchSidebar";
+import MobileNavbar from "@/app/components/MobileNavbar";
 
 export const metadata: Metadata = {
   title: "My Matches | Your Website Name",
@@ -15,15 +15,8 @@ const MyMatchesPage = () => {
         <div className="mx-auto max-w-7xl bg-white p-2 py-15">
           <div className="grid grid-cols-1 gap-5 md:grid-cols-[300px_1fr]">
             <MatchSidebar />
-            <Suspense
-              fallback={
-                <div className="p-6 text-sm text-stone-500">
-                  Loading matches...
-                </div>
-              }
-            >
-              <MyMatches />
-            </Suspense>
+            <MyMatches />
+            <MobileNavbar />
           </div>
         </div>
       </section>

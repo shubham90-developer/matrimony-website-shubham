@@ -1,133 +1,88 @@
 "use client";
 
 import React from "react";
-import {
-  Heart,
-  HeartHandshake,
-  CheckCircle2,
-  Send,
-  Ban,
-  XCircle,
-} from "lucide-react";
-import {
-  useGetSentInterestsQuery,
-  useGetReceivedInterestsQuery,
-} from "@/Redux/interestApi";
-import { useGetMyIgnoredProfilesQuery } from "@/Redux/ignoreApi";
+import Link from "next/link";
+import { Eye, Star, Ban, ChevronRight } from "lucide-react";
 
-const TopCounter = () => {
-  const { data: sentData, isLoading: sentLoading } = useGetSentInterestsQuery();
-  const { data: receivedData, isLoading: receivedLoading } =
-    useGetReceivedInterestsQuery();
-  const { data: ignoredData, isLoading: ignoredLoading } =
-    useGetMyIgnoredProfilesQuery();
+interface StatCardData {
+  title: string;
+  count: number;
+  icon: React.ElementType;
+  gradient: string;
+  href: string;
+}
 
-  const sent = sentData?.data ?? [];
-  const received = receivedData?.data ?? [];
-  const ignored = ignoredData?.data ?? [];
+const cards: StatCardData[] = [
+  {
+    title: "Viewed You",
+    count: 13,
+    icon: Eye,
+    gradient: "from-indigo-400 via-violet-500 to-purple-500",
+    href: "/my-matches/viewed-you",
+  },
+  {
+    title: "Shortlisted",
+    count: 1,
+    icon: Star,
+    gradient: "from-pink-500 via-rose-500 to-pink-600",
+    href: "/my-profile/shortlist",
+  },
+  {
+    title: "Blocked Profiles",
+    count: 4,
+    icon: Ban,
+    gradient: "from-slate-500 via-slate-600 to-slate-700",
+    href: "/my-profile/block",
+  },
+];
 
-  const isLoading = sentLoading || receivedLoading || ignoredLoading;
-
-  // Interests someone sent me that I accepted
-  const acceptedInterestCount = received.filter(
-    (i) => i.status === "Accepted",
-  ).length;
-
-  // Interests someone sent me that I declined
-  const declinedInterestCount = received.filter(
-    (i) => i.status === "Rejected",
-  ).length;
-
-  // Mutual matches: interests I accepted + interests the other person accepted
-  const matchedCount =
-    received.filter((i) => i.status === "Accepted").length +
-    sent.filter((i) => i.status === "Accepted").length;
-
-  const counters = [
-    {
-      title: "Accepted Interest",
-      count: acceptedInterestCount,
-      icon: CheckCircle2,
-      bg: "bg-green-50",
-      iconBg: "bg-green-100",
-      iconColor: "text-green-600",
-    },
-    {
-      title: "Interested Received",
-      count: received.length,
-      icon: Heart,
-      bg: "bg-pink-50",
-      iconBg: "bg-pink-100",
-      iconColor: "text-pink-600",
-    },
-    {
-      title: "Interest Sent",
-      count: sent.length,
-      icon: Send,
-      bg: "bg-sky-50",
-      iconBg: "bg-sky-100",
-      iconColor: "text-sky-600",
-    },
-    {
-      title: "Blocked Users",
-      count: ignored.length,
-      icon: Ban,
-      bg: "bg-red-50",
-      iconBg: "bg-red-100",
-      iconColor: "text-red-600",
-    },
-    {
-      title: "Declined Interest",
-      count: declinedInterestCount,
-      icon: XCircle,
-      bg: "bg-orange-50",
-      iconBg: "bg-orange-100",
-      iconColor: "text-orange-600",
-    },
-    {
-      title: "Matched",
-      count: matchedCount,
-      icon: HeartHandshake,
-      bg: "bg-violet-50",
-      iconBg: "bg-violet-100",
-      iconColor: "text-violet-600",
-    },
-  ];
-
+function StatCard({ title, count, icon: Icon, gradient, href }: StatCardData) {
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-      {counters.map((item) => {
-        const Icon = item.icon;
+    <Link
+      href={href}
+      className={`group relative flex flex-col overflow-hidden rounded-xl xs:rounded-2xl sm:rounded-3xl bg-linear-to-br ${gradient} p-2.5 xs:p-3 sm:p-4 md:p-5 shadow-lg transition-transform duration-300 hover:-translate-y-1 active:scale-[0.98]`}
+    >
+      {/* decorative faint icon in the background, like the reference */}
+      <Icon
+        className="pointer-events-none absolute -bottom-2 -right-2 h-12 w-12 xs:-bottom-3 xs:-right-3 xs:h-16 xs:w-16 sm:-bottom-4 sm:-right-4 sm:h-24 sm:w-24 md:h-28 md:w-28 text-white/10"
+        strokeWidth={1.5}
+      />
 
-        return (
-          <div
-            key={item.title}
-            className={`${item.bg} h-36 rounded-2xl border border-gray-200 p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md`}
-          >
-            <div className="flex h-full flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-xl ${item.iconBg}`}
-                >
-                  <Icon className={item.iconColor} size={24} />
-                </div>
+      <div className="relative flex items-start justify-between">
+        <div className="flex h-7 w-7 xs:h-8 xs:w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 items-center justify-center rounded-full bg-white/25 backdrop-blur-sm">
+          <Icon
+            className="h-3.5 w-3.5 xs:h-4 xs:w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-white"
+            strokeWidth={2}
+          />
+        </div>
 
-                <span className="text-3xl font-bold text-slate-800">
-                  {isLoading ? "-" : item.count}
-                </span>
-              </div>
+        <span className="flex h-4.5 w-4.5 xs:h-5 xs:w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 items-center justify-center rounded-full bg-white/20 text-white transition-transform duration-300 group-hover:translate-x-0.5">
+          <ChevronRight size={10} className="sm:hidden" />
+          <ChevronRight size={12} className="hidden xs:block sm:hidden" />
+          <ChevronRight size={16} className="hidden sm:block" />
+        </span>
+      </div>
 
-              <div>
-                <h3 className="text-sm font-semibold leading-5 text-slate-800">
-                  {item.title}
-                </h3>
-              </div>
-            </div>
-          </div>
-        );
-      })}
+      <div className="relative mt-1.5 xs:mt-2 sm:mt-3 md:mt-4">
+        <p className="text-base xs:text-lg sm:text-2xl md:text-3xl font-bold text-white">
+          {count}
+        </p>
+        <p className="mt-0.5 text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-medium text-white/90 leading-tight line-clamp-2">
+          {title}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+const TopStats = () => {
+  return (
+    <div className="grid grid-cols-3 gap-1.5 xs:gap-2 sm:gap-3 md:gap-4">
+      {cards.map((card) => (
+        <StatCard key={card.title} {...card} />
+      ))}
     </div>
   );
 };
 
-export default TopCounter;
+export default TopStats;
