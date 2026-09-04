@@ -17,6 +17,7 @@ import { authApi } from "./authApi";
 import { packageApi } from "./packagesApi";
 import { termsApi } from "./terms";
 import { privacyPolicyApi } from "./privacy-policyApi";
+import { partnerPreferenceApi } from "./partnerPreffApi";
 
 export const store = configureStore({
   reducer: {
@@ -36,6 +37,7 @@ export const store = configureStore({
     [packageApi.reducerPath]: packageApi.reducer,
     [termsApi.reducerPath]: termsApi.reducer,
     [privacyPolicyApi.reducerPath]: privacyPolicyApi.reducer,
+    [partnerPreferenceApi.reducerPath]: partnerPreferenceApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -55,6 +57,7 @@ export const store = configureStore({
       packageApi.middleware,
       termsApi.middleware,
       privacyPolicyApi.middleware,
+      partnerPreferenceApi.middleware,
     ),
 });
 

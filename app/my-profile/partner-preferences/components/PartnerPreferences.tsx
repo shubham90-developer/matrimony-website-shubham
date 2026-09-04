@@ -1,14 +1,32 @@
 "use client";
 
-import { useState, ChangeEvent } from "react";
+import { useEffect, useMemo, useState, ChangeEvent } from "react";
 import Select, { SingleValue, StylesConfig } from "react-select";
 import ThemeBtnOne from "@/app/components/ThemeBtnOne";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import { Country, State, City } from "country-state-city";
 
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { CalendarDays } from "lucide-react";
+
+import { useGetMyProfileQuery } from "@/Redux/profileApi";
+import {
+  useGetPartnerPreferenceQuery,
+  useSavePartnerPreferenceMutation,
+  type PartnerPreferencePayload,
+} from "@/Redux/partnerPreffApi";
+
+import { useGetReligionsQuery } from "@/Redux/religionApi";
+import { useGetCastesByReligionQuery } from "@/Redux/casteApi";
+import { useGetSubCastesByCasteQuery } from "@/Redux/subCasteApi";
+import { useGetMotherTonguesQuery } from "@/Redux/motherToungeApi";
+import { useGetHeightsQuery } from "@/Redux/heightApi";
+import { useGetQualificationsQuery } from "@/Redux/qualificationApi";
+import { useGetOccupationsQuery } from "@/Redux/occupationApi";
+import { useGetAnnualIncomesQuery } from "@/Redux/annualIncomeApi";
 
 const labelClass = "mb-1.5 block text-sm font-bold text-slate-900";
 
@@ -177,6 +195,8 @@ interface FieldSelectProps {
   onChange: (value: string) => void;
   options: Option[];
   placeholder?: string;
+  isDisabled?: boolean;
+  isLoading?: boolean;
 }
 
 const FieldSelect = ({
@@ -186,6 +206,8 @@ const FieldSelect = ({
   onChange,
   options,
   placeholder = "Select",
+  isDisabled = false,
+  isLoading = false,
 }: FieldSelectProps) => {
   const selectedOption =
     options.find((option) => option.value === value) ?? null;
@@ -207,6 +229,8 @@ const FieldSelect = ({
         placeholder={placeholder}
         isSearchable
         isClearable
+        isDisabled={isDisabled}
+        isLoading={isLoading}
         styles={selectStyles}
         noOptionsMessage={() => "No options found"}
         loadingMessage={() => "Loading..."}
@@ -238,8 +262,399 @@ const PartnerPreferences = () => {
     }));
   };
 
-  const handleSave = (section: PreferencesSection) => {
-    console.log(`Saving ${section}`, form);
+  /* ===================================================
+     PARTNER PREFERENCE API (get logged-in user's saved
+     preferences + save/update them)
+  =================================================== */
+
+  const { data: prefData } = useGetPartnerPreferenceQuery();
+  const [savePartnerPreference, { isLoading: isSaving }] =
+    useSavePartnerPreferenceMutation();
+
+  // Needed as a fallback for `createdBy` when no preference doc exists yet.
+  const { data: myProfileData } = useGetMyProfileQuery();
+
+  /* ===================================================
+     DROPDOWN APIS
+     (religion / caste / sub-caste are cascading, same as
+     the Basic Details screen)
+  =================================================== */
+
+  const { data: religionRes } = useGetReligionsQuery();
+
+  const { data: casteRes, isLoading: casteLoading } =
+    useGetCastesByReligionQuery(form.religion, {
+      skip: !form.religion,
+    });
+
+  const { data: subCasteRes, isLoading: subCasteLoading } =
+    useGetSubCastesByCasteQuery(form.caste, {
+      skip: !form.caste,
+    });
+
+  const { data: motherTongueRes } = useGetMotherTonguesQuery();
+  const { data: heightRes } = useGetHeightsQuery();
+  const { data: qualificationRes } = useGetQualificationsQuery();
+  const { data: occupationRes } = useGetOccupationsQuery();
+  const { data: annualIncomeRes } = useGetAnnualIncomesQuery();
+
+  /* ===================================================
+     COUNTRY / STATE / CITY (cascading, same package used
+     on the Basic Details screen)
+  =================================================== */
+
+  const countryList = useMemo(() => Country.getAllCountries(), []);
+
+  const stateList = useMemo(
+    () => (form.country ? State.getStatesOfCountry(form.country) : []),
+    [form.country],
+  );
+
+  const cityList = useMemo(
+    () =>
+      form.country && form.state
+        ? City.getCitiesOfState(form.country, form.state)
+        : [],
+    [form.country, form.state],
+  );
+
+  /* ===================================================
+     OPTION LISTS
+  =================================================== */
+
+  const religionOptions = useMemo<Option[]>(
+    () =>
+      (religionRes?.data ?? []).map((item) => ({
+        value: item._id,
+        label: item.religion,
+      })),
+    [religionRes],
+  );
+
+  const casteOptions = useMemo<Option[]>(
+    () =>
+      (casteRes?.data ?? []).map((item) => ({
+        value: item._id,
+        label: item.caste,
+      })),
+    [casteRes],
+  );
+
+  const subCasteOptions = useMemo<Option[]>(
+    () =>
+      (subCasteRes?.data ?? []).map((item) => ({
+        value: item._id,
+        label: item.subCaste,
+      })),
+    [subCasteRes],
+  );
+
+  const motherTongueOptions = useMemo<Option[]>(
+    () =>
+      (motherTongueRes?.data ?? []).map((item) => ({
+        value: item._id,
+        label: item.motherTongue,
+      })),
+    [motherTongueRes],
+  );
+
+  const heightOptions = useMemo<Option[]>(
+    () =>
+      (heightRes?.data ?? []).map((item) => ({
+        value: item._id,
+        label: item.height,
+      })),
+    [heightRes],
+  );
+
+  const highestEducationOptions = useMemo<Option[]>(
+    () =>
+      (qualificationRes?.data ?? []).map((item) => ({
+        value: item._id,
+        label: item.qualification,
+      })),
+    [qualificationRes],
+  );
+
+  const occupationOptions = useMemo<Option[]>(
+    () =>
+      (occupationRes?.data ?? []).map((item) => ({
+        value: item._id,
+        label: item.occupation,
+      })),
+    [occupationRes],
+  );
+
+  const annualIncomeOptions = useMemo<Option[]>(
+    () =>
+      (annualIncomeRes?.data ?? []).map((item) => ({
+        value: item._id,
+        label: item.annualIncome,
+      })),
+    [annualIncomeRes],
+  );
+
+  const countryOptions = useMemo<Option[]>(
+    () =>
+      countryList.map((item) => ({
+        value: item.isoCode,
+        label: item.name,
+      })),
+    [countryList],
+  );
+
+  const stateOptions = useMemo<Option[]>(
+    () =>
+      stateList.map((item) => ({
+        value: item.isoCode,
+        label: item.name,
+      })),
+    [stateList],
+  );
+
+  const cityOptions = useMemo<Option[]>(
+    () =>
+      cityList.map((item) => ({
+        value: item.name,
+        label: item.name,
+      })),
+    [cityList],
+  );
+
+  // Real backend name for the currently selected country/state — the
+  // partner-preference API stores plain names (e.g. "India"), not iso codes.
+  const selectedCountryName = useMemo(
+    () => countryList.find((item) => item.isoCode === form.country)?.name ?? "",
+    [countryList, form.country],
+  );
+
+  const selectedStateName = useMemo(
+    () => stateList.find((item) => item.isoCode === form.state)?.name ?? "",
+    [stateList, form.state],
+  );
+
+  /* ===================================================
+     PREFILL FROM SAVED PARTNER PREFERENCE
+  =================================================== */
+
+  useEffect(() => {
+    const pref = prefData?.data;
+    if (!pref) return;
+
+    setForm((prev) => ({
+      ...prev,
+
+      // Age range is stored as minAge/maxAge on the backend; this form only
+      // exposes a single date, so there is no reliable way to reconstruct a
+      // date of birth from a saved age range — left blank on reload.
+      height:
+        pref.basicDetails?.height?.minHeight ||
+        pref.basicDetails?.height?.maxHeight ||
+        "",
+      maritalStatus: pref.basicDetails?.maritalStatus?.preferences?.[0] || "",
+
+      religion: pref.religionAndEthnicity?.religion?.preference || "",
+      caste: pref.religionAndEthnicity?.caste?.preferences?.[0] || "",
+      subCaste: pref.religionAndEthnicity?.subCaste?.preferences?.[0] || "",
+      motherTongue: pref.religionAndEthnicity?.motherTongue?.preference || "",
+
+      highestEducation: pref.educationDetails?.highestDegrees?.[0] || "",
+      occupation: pref.educationDetails?.occupation?.preferences?.[0] || "",
+      annualIncome: pref.educationDetails?.annualIncome || "",
+
+      diet: pref.lifestyleAndAppearance?.dietaryHabits?.preferences?.[0] || "",
+      smoking:
+        pref.lifestyleAndAppearance?.smokingHabits?.preferences?.[0] || "",
+      drinking:
+        pref.lifestyleAndAppearance?.drinkingHabits?.preferences?.[0] || "",
+      physicalStatus:
+        pref.lifestyleAndAppearance?.disability?.preferences?.[0] || "",
+
+      city: pref.basicDetails?.partnerCity?.[0] || prev.city,
+    }));
+
+    // Country / state need a reverse lookup from saved name -> iso code so
+    // the cascading selects (and the city list) resolve correctly.
+    const savedCountryName = pref.basicDetails?.partnerCountry?.[0];
+    if (savedCountryName) {
+      const matchedCountry = Country.getAllCountries().find(
+        (c) => c.name === savedCountryName,
+      );
+
+      if (matchedCountry) {
+        setForm((prev) => ({ ...prev, country: matchedCountry.isoCode }));
+
+        const savedStateName = pref.basicDetails?.partnerState?.[0];
+        if (savedStateName) {
+          const matchedState = State.getStatesOfCountry(
+            matchedCountry.isoCode,
+          ).find((s) => s.name === savedStateName);
+
+          if (matchedState) {
+            setForm((prev) => ({ ...prev, state: matchedState.isoCode }));
+          }
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefData]);
+
+  /* ===================================================
+     SAVE
+     There is a single partner-preference document, so every
+     section's Save button persists the full merged payload —
+     it just reports back which section triggered it.
+  =================================================== */
+
+  const handleSave = async (section: PreferencesSection) => {
+    const existing = prefData?.data;
+
+    // The UI only collects one date of birth, but the backend expects an
+    // age range — the picked date is used as both the min and max age.
+    const age = form.dob
+      ? Math.max(
+          0,
+          new Date().getFullYear() -
+            new Date(form.dob).getFullYear() -
+            (new Date().setFullYear(2000) < new Date(form.dob).setFullYear(2000)
+              ? 1
+              : 0),
+        )
+      : undefined;
+
+    const minAge = age ?? existing?.basicDetails?.age?.minAge ?? 0;
+    const maxAge = age ?? existing?.basicDetails?.age?.maxAge ?? 0;
+
+    // The UI only lets a person pick one height, so it's sent as both ends
+    // of the accepted height range.
+    const heightId = form.height || undefined;
+    const minHeight =
+      heightId || existing?.basicDetails?.height?.minHeight || "";
+    const maxHeight =
+      heightId || existing?.basicDetails?.height?.maxHeight || "";
+
+    const payload: PartnerPreferencePayload = {
+      basicDetails: {
+        age: { minAge, maxAge },
+        height: { minHeight, maxHeight },
+        partnerCountry: selectedCountryName
+          ? [selectedCountryName]
+          : (existing?.basicDetails?.partnerCountry as string[]) || [],
+        partnerState: selectedStateName
+          ? [selectedStateName]
+          : (existing?.basicDetails?.partnerState as string[]) || [],
+        partnerCity: form.city
+          ? [form.city]
+          : (existing?.basicDetails?.partnerCity as string[]) || [],
+        maritalStatus: {
+          preferences: form.maritalStatus
+            ? [form.maritalStatus]
+            : (existing?.basicDetails?.maritalStatus
+                ?.preferences as string[]) || [],
+        },
+      },
+
+      educationDetails: {
+        doesntMatter: existing?.educationDetails?.doesntMatter ?? false,
+        highestDegrees: form.highestEducation
+          ? [form.highestEducation]
+          : (existing?.educationDetails?.highestDegrees as string[]) || [],
+        wellKnownColleges: existing?.educationDetails?.wellKnownColleges || "",
+        occupation: {
+          doesntMatter:
+            existing?.educationDetails?.occupation?.doesntMatter ?? false,
+          preferences: form.occupation
+            ? [form.occupation]
+            : (existing?.educationDetails?.occupation
+                ?.preferences as string[]) || [],
+        },
+        annualIncome:
+          form.annualIncome || existing?.educationDetails?.annualIncome || "",
+      },
+
+      familyDetails: {
+        familyBasedOutOfCountry: {
+          country:
+            existing?.familyDetails?.familyBasedOutOfCountry?.country || "",
+        },
+      },
+
+      religionAndEthnicity: {
+        religion: {
+          preference:
+            form.religion ||
+            existing?.religionAndEthnicity?.religion?.preference ||
+            "",
+        },
+        caste: {
+          preferences: form.caste
+            ? [form.caste]
+            : (existing?.religionAndEthnicity?.caste
+                ?.preferences as string[]) || [],
+        },
+        subCaste: {
+          preferences: form.subCaste
+            ? [form.subCaste]
+            : (existing?.religionAndEthnicity?.subCaste
+                ?.preferences as string[]) || [],
+        },
+        motherTongue: {
+          preference:
+            form.motherTongue ||
+            existing?.religionAndEthnicity?.motherTongue?.preference ||
+            "",
+        },
+        manglikStatus: {
+          preferences:
+            (existing?.religionAndEthnicity?.manglikStatus
+              ?.preferences as string[]) || [],
+        },
+      },
+
+      // Options for these four fields stay hardcoded (no admin API exists
+      // for them yet) — their currently selected values are still included
+      // here since Save always persists the one shared preference document.
+      lifestyleAndAppearance: {
+        dietaryHabits: {
+          preferences: form.diet
+            ? [form.diet]
+            : (existing?.lifestyleAndAppearance?.dietaryHabits
+                ?.preferences as string[]) || [],
+        },
+        smokingHabits: {
+          preferences: form.smoking
+            ? [form.smoking]
+            : (existing?.lifestyleAndAppearance?.smokingHabits
+                ?.preferences as string[]) || [],
+        },
+        drinkingHabits: {
+          preferences: form.drinking
+            ? [form.drinking]
+            : (existing?.lifestyleAndAppearance?.drinkingHabits
+                ?.preferences as string[]) || [],
+        },
+        disability: {
+          preferences: form.physicalStatus
+            ? [form.physicalStatus]
+            : (existing?.lifestyleAndAppearance?.disability
+                ?.preferences as string[]) || [],
+        },
+      },
+
+      aboutMyPartner: {
+        description: existing?.aboutMyPartner?.description || "",
+      },
+
+      createdBy: existing?.createdBy || myProfileData?.data?.userId || "",
+    };
+
+    try {
+      await savePartnerPreference(payload).unwrap();
+      toast.success(`Partner ${section} preferences saved`);
+    } catch (error) {
+      console.error("Save partner preference error:", error);
+      toast.error(`Failed to save partner ${section} preferences`);
+    }
   };
 
   return (
@@ -286,15 +701,15 @@ const PartnerPreferences = () => {
               onChange={(value) => handleSelectChange("gender", value)}
               options={[
                 {
-                  value: "male",
+                  value: "Male",
                   label: "Male",
                 },
                 {
-                  value: "female",
+                  value: "Female",
                   label: "Female",
                 },
                 {
-                  value: "other",
+                  value: "Other",
                   label: "Other",
                 },
               ]}
@@ -381,24 +796,7 @@ const PartnerPreferences = () => {
               value={form.height}
               onChange={(value) => handleSelectChange("height", value)}
               placeholder="Search height..."
-              options={[
-                {
-                  value: "4ft6in",
-                  label: '4′ 6" (137 cm)',
-                },
-                {
-                  value: "5ft0in",
-                  label: '5′ 0" (152 cm)',
-                },
-                {
-                  value: "5ft6in",
-                  label: '5′ 6" (168 cm)',
-                },
-                {
-                  value: "6ft0in",
-                  label: '6′ 0" (183 cm)',
-                },
-              ]}
+              options={heightOptions}
             />
 
             {/* Religion */}
@@ -407,30 +805,14 @@ const PartnerPreferences = () => {
               id="religion"
               label="Religion"
               value={form.religion}
-              onChange={(value) => handleSelectChange("religion", value)}
+              onChange={(value) => {
+                handleSelectChange("religion", value);
+                // Cascading fields no longer apply once religion changes.
+                handleSelectChange("caste", "");
+                handleSelectChange("subCaste", "");
+              }}
               placeholder="Search religion..."
-              options={[
-                {
-                  value: "hindu",
-                  label: "Hindu",
-                },
-                {
-                  value: "muslim",
-                  label: "Muslim",
-                },
-                {
-                  value: "christian",
-                  label: "Christian",
-                },
-                {
-                  value: "sikh",
-                  label: "Sikh",
-                },
-                {
-                  value: "jain",
-                  label: "Jain",
-                },
-              ]}
+              options={religionOptions}
             />
 
             {/* Caste */}
@@ -439,14 +821,16 @@ const PartnerPreferences = () => {
               id="caste"
               label="Caste"
               value={form.caste}
-              onChange={(value) => handleSelectChange("caste", value)}
-              placeholder="Search caste..."
-              options={[
-                {
-                  value: "maratha",
-                  label: "Maratha",
-                },
-              ]}
+              onChange={(value) => {
+                handleSelectChange("caste", value);
+                handleSelectChange("subCaste", "");
+              }}
+              placeholder={
+                form.religion ? "Search caste..." : "Select religion first"
+              }
+              options={casteOptions}
+              isDisabled={!form.religion}
+              isLoading={casteLoading}
             />
 
             {/* Sub Caste */}
@@ -456,13 +840,12 @@ const PartnerPreferences = () => {
               label="Sub caste"
               value={form.subCaste}
               onChange={(value) => handleSelectChange("subCaste", value)}
-              placeholder="Search sub caste..."
-              options={[
-                {
-                  value: "96kuli",
-                  label: "96 Kuli Maratha",
-                },
-              ]}
+              placeholder={
+                form.caste ? "Search sub caste..." : "Select caste first"
+              }
+              options={subCasteOptions}
+              isDisabled={!form.caste}
+              isLoading={subCasteLoading}
             />
 
             {/* Mother Tongue */}
@@ -473,20 +856,7 @@ const PartnerPreferences = () => {
               value={form.motherTongue}
               onChange={(value) => handleSelectChange("motherTongue", value)}
               placeholder="Search mother tongue..."
-              options={[
-                {
-                  value: "marathi",
-                  label: "Marathi",
-                },
-                {
-                  value: "hindi",
-                  label: "Hindi",
-                },
-                {
-                  value: "english",
-                  label: "English",
-                },
-              ]}
+              options={motherTongueOptions}
             />
 
             {/* Country */}
@@ -495,14 +865,13 @@ const PartnerPreferences = () => {
               id="country"
               label="Residing country"
               value={form.country}
-              onChange={(value) => handleSelectChange("country", value)}
+              onChange={(value) => {
+                handleSelectChange("country", value);
+                handleSelectChange("state", "");
+                handleSelectChange("city", "");
+              }}
               placeholder="Search country..."
-              options={[
-                {
-                  value: "india",
-                  label: "India",
-                },
-              ]}
+              options={countryOptions}
             />
 
             {/* State */}
@@ -511,14 +880,15 @@ const PartnerPreferences = () => {
               id="state"
               label="Residing state"
               value={form.state}
-              onChange={(value) => handleSelectChange("state", value)}
-              placeholder="Search state..."
-              options={[
-                {
-                  value: "maharashtra",
-                  label: "Maharashtra",
-                },
-              ]}
+              onChange={(value) => {
+                handleSelectChange("state", value);
+                handleSelectChange("city", "");
+              }}
+              placeholder={
+                form.country ? "Search state..." : "Select country first"
+              }
+              options={stateOptions}
+              isDisabled={!form.country}
             />
 
             {/* City */}
@@ -528,13 +898,9 @@ const PartnerPreferences = () => {
               label="Residing city"
               value={form.city}
               onChange={(value) => handleSelectChange("city", value)}
-              placeholder="Search city..."
-              options={[
-                {
-                  value: "pune",
-                  label: "Pune",
-                },
-              ]}
+              placeholder={form.state ? "Search city..." : "Select state first"}
+              options={cityOptions}
+              isDisabled={!form.state}
             />
 
             {/* Marital Status */}
@@ -547,19 +913,19 @@ const PartnerPreferences = () => {
               placeholder="Search marital status..."
               options={[
                 {
-                  value: "neverMarried",
+                  value: "Never Married",
                   label: "Never married",
                 },
                 {
-                  value: "married",
+                  value: "Married",
                   label: "Married",
                 },
                 {
-                  value: "divorced",
+                  value: "Divorced",
                   label: "Divorced",
                 },
                 {
-                  value: "widowed",
+                  value: "Widowed",
                   label: "Widowed",
                 },
               ]}
@@ -568,7 +934,8 @@ const PartnerPreferences = () => {
 
           <div className="mt-6 flex justify-end">
             <ThemeBtnOne
-              text="Save"
+              text={isSaving ? "Saving..." : "Save"}
+              disabled={isSaving}
               onClick={() => handleSave("basic details")}
               className="mt-4 cursor-pointer rounded-full bg-rose-500 px-3 py-2 font-serif text-white"
             />
@@ -595,23 +962,12 @@ const PartnerPreferences = () => {
                 handleSelectChange("highestEducation", value)
               }
               placeholder="Search education..."
-              options={[
-                {
-                  value: "graduate",
-                  label: "Graduate",
-                },
-                {
-                  value: "postGraduate",
-                  label: "Post graduate",
-                },
-                {
-                  value: "doctorate",
-                  label: "Doctorate",
-                },
-              ]}
+              options={highestEducationOptions}
             />
 
-            {/* UG Degree */}
+            {/* UG Degree — no dedicated lookup API exists for this yet, and
+                the partner-preference schema has no separate slot for it,
+                so it stays local-only (kept exactly as before). */}
 
             <FieldSelect
               id="ugDegree"
@@ -643,24 +999,7 @@ const PartnerPreferences = () => {
               value={form.occupation}
               onChange={(value) => handleSelectChange("occupation", value)}
               placeholder="Search occupation..."
-              options={[
-                {
-                  value: "government",
-                  label: "Government",
-                },
-                {
-                  value: "private",
-                  label: "Private sector",
-                },
-                {
-                  value: "business",
-                  label: "Business",
-                },
-                {
-                  value: "notWorking",
-                  label: "Not working",
-                },
-              ]}
+              options={occupationOptions}
             />
 
             {/* Annual Income */}
@@ -671,30 +1010,14 @@ const PartnerPreferences = () => {
               value={form.annualIncome}
               onChange={(value) => handleSelectChange("annualIncome", value)}
               placeholder="Search income..."
-              options={[
-                {
-                  value: "1-2lakh",
-                  label: "1-2 lakh",
-                },
-                {
-                  value: "2-5lakh",
-                  label: "2-5 lakh",
-                },
-                {
-                  value: "5-10lakh",
-                  label: "5-10 lakh",
-                },
-                {
-                  value: "10lakh+",
-                  label: "10 lakh+",
-                },
-              ]}
+              options={annualIncomeOptions}
             />
           </div>
 
           <div className="mt-6 flex justify-end">
             <ThemeBtnOne
-              text="Save"
+              text={isSaving ? "Saving..." : "Save"}
+              disabled={isSaving}
               onClick={() => handleSave("education & occupation")}
               className="mt-4 cursor-pointer rounded-full bg-rose-500 px-3 py-2 font-serif text-white"
             />
@@ -703,6 +1026,8 @@ const PartnerPreferences = () => {
 
         {/* =================================================
             LIFESTYLE
+            NOTE: kept fully static per instructions — there is
+            no admin API yet to source these option lists from.
         ================================================= */}
 
         <div className="rounded-md bg-rose-50 p-4">
@@ -721,20 +1046,24 @@ const PartnerPreferences = () => {
               placeholder="Search diet..."
               options={[
                 {
-                  value: "vegetarian",
+                  value: "Vegetarian",
                   label: "Vegetarian",
                 },
                 {
-                  value: "nonVegetarian",
-                  label: "Non-vegetarian",
+                  value: "Non Vegetarian",
+                  label: "Non Vegetarian",
                 },
                 {
-                  value: "eggetarian",
+                  value: "Jain",
+                  label: "Jain",
+                },
+                {
+                  value: "Eggetarian",
                   label: "Eggetarian",
                 },
                 {
-                  value: "vegan",
-                  label: "Vegan",
+                  value: "Doesn't Matter",
+                  label: "Doesn't Matter",
                 },
               ]}
             />
@@ -749,15 +1078,15 @@ const PartnerPreferences = () => {
               placeholder="Search smoking habit..."
               options={[
                 {
-                  value: "no",
+                  value: "No",
                   label: "No",
                 },
                 {
-                  value: "occasionally",
+                  value: "Occasionally",
                   label: "Occasionally",
                 },
                 {
-                  value: "yes",
+                  value: "Yes",
                   label: "Yes",
                 },
               ]}
@@ -773,15 +1102,15 @@ const PartnerPreferences = () => {
               placeholder="Search drinking habit..."
               options={[
                 {
-                  value: "no",
+                  value: "No",
                   label: "No",
                 },
                 {
-                  value: "occasionally",
+                  value: "Occasionally",
                   label: "Occasionally",
                 },
                 {
-                  value: "yes",
+                  value: "Yes",
                   label: "Yes",
                 },
               ]}
@@ -791,18 +1120,34 @@ const PartnerPreferences = () => {
 
             <FieldSelect
               id="physicalStatus"
-              label="Physical status"
+              label="Disability"
               value={form.physicalStatus}
               onChange={(value) => handleSelectChange("physicalStatus", value)}
-              placeholder="Search physical status..."
+              placeholder="Search disability..."
               options={[
                 {
-                  value: "normal",
-                  label: "Normal",
+                  value: "None",
+                  label: "None",
                 },
                 {
-                  value: "physicallyChallenged",
-                  label: "Physically challenged",
+                  value: "Physically disabled from birth",
+                  label: "Physically disabled from birth",
+                },
+                {
+                  value: "Physically disabled due to accident",
+                  label: "Physically disabled due to accident",
+                },
+                {
+                  value: "Mentally disabled from birth",
+                  label: "Mentally disabled from birth",
+                },
+                {
+                  value: "Mentally disabled due to accident",
+                  label: "Mentally disabled due to accident",
+                },
+                {
+                  value: "Doesn't Matter",
+                  label: "Doesn't Matter",
                 },
               ]}
             />
@@ -810,7 +1155,8 @@ const PartnerPreferences = () => {
 
           <div className="mt-6 flex justify-end">
             <ThemeBtnOne
-              text="Save"
+              text={isSaving ? "Saving..." : "Save"}
+              disabled={isSaving}
               onClick={() => handleSave("lifestyle")}
               className="mt-4 cursor-pointer rounded-full bg-rose-500 px-3 py-2 font-serif text-white"
             />

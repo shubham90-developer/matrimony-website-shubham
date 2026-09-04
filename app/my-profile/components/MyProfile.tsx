@@ -124,6 +124,9 @@ const MyProfile = () => {
       {
         degree: apiProfile.education.highestDegree,
         school: apiProfile.education.school,
+        // FIX: was previously only shown (hardcoded) under Career; now bound
+        // to the actual field here too so the Education card can render it.
+        about: apiProfile.education.aboutEducation,
       },
     ],
     career: {
@@ -155,7 +158,43 @@ const MyProfile = () => {
       birthPlace: `Born in ${apiProfile.horoscopeDetails.birthPlace.city}, ${apiProfile.horoscopeDetails.birthPlace.state}, ${apiProfile.horoscopeDetails.birthPlace.country}`,
       horoscopeMustMatch: apiProfile.religionDetails.hasDosh,
     },
+    // FIX: this whole block was missing before — "My lifestyle & interests"
+    // was rendering a hardcoded placeholder instead of apiProfile.lifestyle.
+    lifestyle: {
+      dietaryHabit: apiProfile.lifestyle?.dietaryHabit || "",
+      drinkingHabit: apiProfile.lifestyle?.drinkingHabit || "",
+      smokingHabit: apiProfile.lifestyle?.smokingHabit || "",
+      dressStyle: apiProfile.lifestyle?.dressStyle || "",
+      hobbies: apiProfile.lifestyle?.hobbies || [],
+      sports: apiProfile.lifestyle?.sports || [],
+      cuisine: apiProfile.lifestyle?.cuisine || [],
+      favouriteMusic: apiProfile.lifestyle?.favouriteMusic || [],
+      favouriteBooks: apiProfile.lifestyle?.favouriteBooks || [],
+      movies: apiProfile.lifestyle?.movies || [],
+      hasData: Boolean(
+        apiProfile.lifestyle?.dietaryHabit ||
+        apiProfile.lifestyle?.drinkingHabit ||
+        apiProfile.lifestyle?.smokingHabit ||
+        apiProfile.lifestyle?.dressStyle ||
+        apiProfile.lifestyle?.hobbies?.length ||
+        apiProfile.lifestyle?.sports?.length ||
+        apiProfile.lifestyle?.cuisine?.length ||
+        apiProfile.lifestyle?.favouriteMusic?.length ||
+        apiProfile.lifestyle?.favouriteBooks?.length ||
+        apiProfile.lifestyle?.movies?.length,
+      ),
+    },
   };
+
+  // Grouped lifestyle tag data, used to render the "My lifestyle & interests" card.
+  const lifestyleTagGroups = [
+    { label: "Hobbies", items: profile.lifestyle.hobbies },
+    { label: "Sports", items: profile.lifestyle.sports },
+    { label: "Cuisine", items: profile.lifestyle.cuisine },
+    { label: "Music", items: profile.lifestyle.favouriteMusic },
+    { label: "Books", items: profile.lifestyle.favouriteBooks },
+    { label: "Movies & Shows", items: profile.lifestyle.movies },
+  ].filter((group) => group.items.length > 0);
 
   return (
     <div>
@@ -309,8 +348,13 @@ const MyProfile = () => {
                   </div>
                 ))}
               </div>
-              <div className="mt-3 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-400">
-                About my education
+              {/* FIX: was a static "About my education" label with no data.
+                  Now renders the real aboutEducation text, and falls back
+                  to the original placeholder only when it's empty. */}
+              <div className="mt-3 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-500">
+                {profile.education[0]?.about || (
+                  <span className="text-stone-400">About my education</span>
+                )}
               </div>
             </SectionCard>
 
@@ -505,9 +549,57 @@ const MyProfile = () => {
               subtitle="Give other profiles a glimpse of your favourite activities"
               editHref={EDIT_ROUTES.lifestyleInterests}
             >
-              <div className="border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-400">
-                Add your hobbies, interests and lifestyle preferences.
-              </div>
+              {/* FIX: previously a hardcoded placeholder regardless of data.
+                  Now renders apiProfile.lifestyle, and only falls back to
+                  the placeholder when the user truly hasn't filled it in. */}
+              {profile.lifestyle.hasData ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2 text-xs text-stone-600">
+                    {profile.lifestyle.dietaryHabit && (
+                      <span className="border border-stone-200 rounded-full px-3 py-1 bg-stone-50">
+                        🍽 {profile.lifestyle.dietaryHabit}
+                      </span>
+                    )}
+                    {profile.lifestyle.drinkingHabit && (
+                      <span className="border border-stone-200 rounded-full px-3 py-1 bg-stone-50">
+                        🍷 Drinks: {profile.lifestyle.drinkingHabit}
+                      </span>
+                    )}
+                    {profile.lifestyle.smokingHabit && (
+                      <span className="border border-stone-200 rounded-full px-3 py-1 bg-stone-50">
+                        🚬 Smokes: {profile.lifestyle.smokingHabit}
+                      </span>
+                    )}
+                    {profile.lifestyle.dressStyle && (
+                      <span className="border border-stone-200 rounded-full px-3 py-1 bg-stone-50">
+                        👕 {profile.lifestyle.dressStyle} style
+                      </span>
+                    )}
+                  </div>
+
+                  {lifestyleTagGroups.map((group) => (
+                    <div key={group.label}>
+                      <p className="text-[11px] font-medium text-stone-400 mb-1">
+                        {group.label}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {group.items.map((item, idx) => (
+                          <span
+                            key={idx}
+                            className="border border-stone-200 rounded-full px-3 py-1 text-xs text-stone-600 bg-white"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-400">
+                  Add your hobbies, interests and lifestyle preferences.
+                </div>
+              )}
             </SectionCard>
           </>
         ) : (
@@ -608,6 +700,11 @@ const MyProfile = () => {
               subtitle="Give other profiles a glimpse of your favourite activities"
               editHref={EDIT_ROUTES.lifestyleInterests}
             >
+              {/* NOTE: left as-is intentionally — the API response has no
+                  partner-preference lifestyle data to bind this to yet.
+                  Once your backend returns something like
+                  apiProfile.partnerPreferences.lifestyle, map it here the
+                  same way "My lifestyle & interests" is done above. */}
               <div className="border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-400">
                 Add your hobbies, interests and lifestyle preferences.
               </div>
