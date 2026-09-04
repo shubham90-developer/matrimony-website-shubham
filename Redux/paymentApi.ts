@@ -25,6 +25,7 @@ export interface VerifyPaymentRequest {
   razorpayOrderId: string;
   razorpayPaymentId: string;
   razorpaySignature: string;
+  idempotencyKey: string;
 }
 
 export interface VerifyPaymentResponse {

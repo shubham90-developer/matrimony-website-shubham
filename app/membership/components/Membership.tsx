@@ -103,11 +103,10 @@ const Membership = () => {
         return;
       }
 
-      // 2. Ask our backend to validate the package and create a Razorpay order
-      //    (backend applies any upgrade proration itself; the preview step is
-      //    only used to show the user what they'll pay before confirming)
       const orderRes = await createOrder({ packageId: pkg._id }).unwrap();
       const { orderId, amount, currency } = orderRes.data;
+
+      const idempotencyKey = `b92bf75b-7f51-4377-9477-d52e291c9253`;
 
       // 3. Open Razorpay's checkout popup with that order
       const razorpay = new RazorpayCheckout({
@@ -125,6 +124,7 @@ const Membership = () => {
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
+              idempotencyKey,
             }).unwrap();
 
             // 5. Subscription is now active on the backend
