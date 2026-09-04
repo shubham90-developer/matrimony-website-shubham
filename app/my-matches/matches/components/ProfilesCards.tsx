@@ -58,9 +58,6 @@ interface Profile {
 const FALLBACK_IMAGE = "/img/profile/1.jpg";
 const NEW_PROFILE_WINDOW_DAYS = 14;
 
-// Query params the Header's "Browse Profiles By" mega menu can set on
-// /my-matches/matches. Forwarded to the feed API as-is under these keys —
-// rename any of these once the real backend field names are confirmed.
 const FILTER_PARAM_KEYS = [
   "religion",
   "motherTongue",
