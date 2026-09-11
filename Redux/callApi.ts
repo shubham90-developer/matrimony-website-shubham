@@ -24,6 +24,32 @@ export interface CallTokenData {
   expiresIn: number;
 }
 
+export interface CallHistoryParticipant {
+  profileId: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  profilePhoto?: string | null;
+}
+
+export interface CallHistoryItem {
+  id: string;
+  callId: string;
+  senderId: string;
+  receiverId: string;
+  callType: CallType;
+  status: CallStatus;
+  duration?: number;
+  endedBy?: string | null;
+  createdAt?: string | { _seconds: number; _nanoseconds: number };
+  participant: CallHistoryParticipant | null;
+}
+
+export interface GetCallHistoryResponse {
+  success: boolean;
+  message?: string;
+  data: CallHistoryItem[];
+}
 export interface GetCallTokenResponse {
   success: boolean;
   message?: string;
@@ -62,9 +88,6 @@ export const callApi = createApi({
       }),
     }),
 
-    // Hits the existing POST /v1/api/call/update — used to log every
-    // stage of the call (ringing/answered/rejected/missed/ended) into
-    // Firestore call history, same as before this change.
     updateCall: builder.mutation<UpdateCallResponse, UpdateCallRequest>({
       query: (body) => ({
         url: "/call/update",
@@ -73,7 +96,16 @@ export const callApi = createApi({
       }),
       invalidatesTags: ["Call"],
     }),
+
+    getCallHistory: builder.query<GetCallHistoryResponse, void>({
+      query: () => "/call/history",
+      providesTags: ["Call"],
+    }),
   }),
 });
 
-export const { useGetCallTokenMutation, useUpdateCallMutation } = callApi;
+export const {
+  useGetCallTokenMutation,
+  useUpdateCallMutation,
+  useGetCallHistoryQuery,
+} = callApi;

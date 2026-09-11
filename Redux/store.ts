@@ -22,6 +22,7 @@ import { profileVisitApi } from "./profileVisitsApi";
 import { counterApi } from "./counter";
 import { paymentApi } from "./paymentApi";
 import { callApi } from "./callApi";
+import { chatApi } from "./chatApi";
 
 export const store = configureStore({
   reducer: {
@@ -46,6 +47,7 @@ export const store = configureStore({
     [counterApi.reducerPath]: counterApi.reducer,
     [paymentApi.reducerPath]: paymentApi.reducer,
     [callApi.reducerPath]: callApi.reducer,
+    [chatApi.reducerPath]: chatApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -70,6 +72,7 @@ export const store = configureStore({
       counterApi.middleware,
       paymentApi.middleware,
       callApi.middleware,
+      chatApi.middleware,
     ),
 });
 

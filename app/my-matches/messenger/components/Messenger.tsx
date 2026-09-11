@@ -4,8 +4,15 @@ import { useState } from "react";
 import { Heart, Phone, ChevronRight, ArrowRight, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useGetChatsQuery } from "@/Redux/chatApi";
+import { useGetCallHistoryQuery } from "@/Redux/callApi";
 
 type ChatItem = {
+  // Real Profile _id (Mongo ObjectId) of the other person in this chat.
+  // This is what gets sent to the backend when placing a call, so it
+  // must be a real profile id once this list is wired to real data —
+  // it is NOT used for the (still mock) chat messages themselves.
+  profileId: string;
   name: string;
   subtitle: string;
   subtitleIcon?: "phone" | null;
@@ -16,44 +23,6 @@ type ChatItem = {
   image: string | null;
   ringed?: boolean;
 };
-
-const CHATS: ChatItem[] = [
-  {
-    name: "Zaraa z",
-    subtitle: "9898989898",
-    date: "28 Aug 2026",
-    accepted: true,
-    unread: 1,
-    image: "/img/matches/1.jpg",
-    ringed: true,
-  },
-  {
-    name: "Riya Thakur",
-    subtitle: "Voice call",
-    subtitleIcon: "phone",
-    date: "28 Aug 2026",
-    time: "10:32 AM",
-    image: "/img/matches/2.jpg",
-  },
-  {
-    name: "Priya Verma",
-    subtitle: "Hi",
-    date: "27 Aug 2026",
-    time: "09:15 PM",
-    image: "/img/matches/3.jpg",
-  },
-];
-
-const CALLS: ChatItem[] = [
-  {
-    name: "Riya Thakur",
-    subtitle: "Voice call",
-    subtitleIcon: "phone",
-    date: "28 Aug 2026",
-    time: "10:32 AM",
-    image: "/img/matches/2.jpg",
-  },
-];
 
 const TABS = [
   {
@@ -66,6 +35,62 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
+
+// ---------------------------------------------------------------------
+// Helpers: Firestore timestamps come back either as an ISO string or as
+// { _seconds, _nanoseconds } depending on serialization — handle both,
+// and fall back gracefully to "" so the row never breaks/crashes.
+// ---------------------------------------------------------------------
+type FirestoreLikeTimestamp =
+  | string
+  | { _seconds: number; _nanoseconds: number }
+  | null
+  | undefined;
+
+function toDate(value: FirestoreLikeTimestamp): Date | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === "object" && "_seconds" in value) {
+    return new Date(value._seconds * 1000);
+  }
+  return null;
+}
+
+function formatDate(value: FirestoreLikeTimestamp): string {
+  const d = toDate(value);
+  if (!d) return "";
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatTime(value: FirestoreLikeTimestamp): string {
+  const d = toDate(value);
+  if (!d) return "";
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function fullNameOf(participant?: {
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+}) {
+  if (!participant) return "Unknown";
+  return (
+    participant.fullName?.trim() ||
+    `${participant.firstName ?? ""} ${participant.lastName ?? ""}`.trim() ||
+    "Unknown"
+  );
+}
 
 function Avatar({ item }: { item: ChatItem }) {
   return (
@@ -92,9 +117,19 @@ function Avatar({ item }: { item: ChatItem }) {
 }
 
 function ChatRow({ item }: { item: ChatItem }) {
+  // Pass the real receiver profile id (+ display info) through to the
+  // details page so the call button there has what it needs to start
+  // a real ZegoCloud call. Chat messages on the details page stay
+  // frontend-only/mock — only the call wiring uses this id.
+  const detailsHref = `/my-matches/messenger/details?${new URLSearchParams({
+    receiverId: item.profileId,
+    name: item.name,
+    ...(item.image ? { avatar: item.image } : {}),
+  }).toString()}`;
+
   return (
     <Link
-      href="/my-matches/messenger/details"
+      href={detailsHref}
       className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm transition hover:shadow-md cursor-pointer"
     >
       <Avatar item={item} />
@@ -143,6 +178,29 @@ function ChatRow({ item }: { item: ChatItem }) {
   );
 }
 
+// Skeleton row shown while a tab's data is loading — mirrors ChatRow's
+// exact box size/spacing so the list doesn't jump once real data lands.
+function ChatRowSkeleton() {
+  return (
+    <div className="flex animate-pulse items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
+      <div className="h-14 w-14 shrink-0 rounded-full bg-slate-100" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="h-3.5 w-1/3 rounded bg-slate-100" />
+        <div className="h-3 w-1/2 rounded bg-slate-100" />
+      </div>
+      <div className="h-3 w-14 shrink-0 rounded bg-slate-100" />
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+      <p className="text-sm text-slate-400">{message}</p>
+    </div>
+  );
+}
+
 function PromoBanner() {
   return (
     <div className="relative mt-2 overflow-hidden rounded-2xl bg-rose-50 p-5">
@@ -177,7 +235,60 @@ const ChatHistory = () => {
   const [active, setActive] = useState<TabKey>("accepted");
 
   const activeTab = TABS.find((t) => t.key === active)!;
-  const list = active === "accepted" ? CHATS : CALLS;
+
+  // Real chat list — GET /v1/api/chat/get-chats. A room only exists once
+  // an interest request has been accepted, so every result is "Accepted".
+  const {
+    data: chatsResponse,
+    isLoading: chatsLoading,
+    isError: chatsError,
+  } = useGetChatsQuery(undefined, { skip: active !== "accepted" });
+
+  // Real call history — GET /v1/api/call/history.
+  const {
+    data: callsResponse,
+    isLoading: callsLoading,
+    isError: callsError,
+  } = useGetCallHistoryQuery(undefined, { skip: active !== "call" });
+
+  const chatItems: ChatItem[] =
+    chatsResponse?.data.map((room) => ({
+      profileId: room.participant.profileId,
+      name: fullNameOf(room.participant),
+      subtitle:
+        room.lastMessageType === "VOICE_CALL"
+          ? room.lastMessage || "Voice call"
+          : room.lastMessage || "Say hi and start the conversation",
+      subtitleIcon: room.lastMessageType === "VOICE_CALL" ? "phone" : null,
+      date: formatDate(room.lastMessageAt),
+      time: formatTime(room.lastMessageAt) || undefined,
+      accepted: true,
+      image: room.participant.profilePhoto || null,
+    })) ?? [];
+
+  const callItems: ChatItem[] =
+    callsResponse?.data.map((call) => {
+      const label =
+        call.status === "missed"
+          ? `Missed ${call.callType} call`
+          : call.status === "rejected"
+            ? `Rejected ${call.callType} call`
+            : `${call.callType.charAt(0).toUpperCase()}${call.callType.slice(1)} call`;
+
+      return {
+        profileId: call.participant?.profileId ?? "",
+        name: fullNameOf(call.participant ?? undefined),
+        subtitle: label,
+        subtitleIcon: "phone",
+        date: formatDate(call.createdAt),
+        time: formatTime(call.createdAt) || undefined,
+        image: call.participant?.profilePhoto || null,
+      };
+    }) ?? [];
+
+  const list = active === "accepted" ? chatItems : callItems;
+  const isLoading = active === "accepted" ? chatsLoading : callsLoading;
+  const isError = active === "accepted" ? chatsError : callsError;
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-2 md:p-8">
@@ -215,9 +326,27 @@ const ChatHistory = () => {
 
       {/* List */}
       <div className="space-y-3">
-        {list.map((item) => (
-          <ChatRow key={item.name} item={item} />
-        ))}
+        {isLoading ? (
+          <>
+            <ChatRowSkeleton />
+            <ChatRowSkeleton />
+            <ChatRowSkeleton />
+          </>
+        ) : isError ? (
+          <EmptyState message="Couldn't load this right now. Please try again in a moment." />
+        ) : list.length === 0 ? (
+          <EmptyState
+            message={
+              active === "accepted"
+                ? "No accepted chats yet. Once someone accepts your interest, they'll show up here."
+                : "No calls yet."
+            }
+          />
+        ) : (
+          list.map((item) => (
+            <ChatRow key={`${item.profileId}-${item.name}`} item={item} />
+          ))
+        )}
 
         <PromoBanner />
       </div>
