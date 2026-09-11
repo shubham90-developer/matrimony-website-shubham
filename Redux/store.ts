@@ -21,6 +21,7 @@ import { partnerPreferenceApi } from "./partnerPreffApi";
 import { profileVisitApi } from "./profileVisitsApi";
 import { counterApi } from "./counter";
 import { paymentApi } from "./paymentApi";
+import { callApi } from "./callApi";
 
 export const store = configureStore({
   reducer: {
@@ -44,6 +45,7 @@ export const store = configureStore({
     [profileVisitApi.reducerPath]: profileVisitApi.reducer,
     [counterApi.reducerPath]: counterApi.reducer,
     [paymentApi.reducerPath]: paymentApi.reducer,
+    [callApi.reducerPath]: callApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -67,6 +69,7 @@ export const store = configureStore({
       profileVisitApi.middleware,
       counterApi.middleware,
       paymentApi.middleware,
+      callApi.middleware,
     ),
 });
 

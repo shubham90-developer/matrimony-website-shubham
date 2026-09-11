@@ -12,9 +12,11 @@ import {
   Flag,
 } from "lucide-react";
 import Link from "next/link";
+import toast from "react-hot-toast";
 
 import Image from "next/image";
 
+import CallModal from "./callModel";
 type MessageType = "system" | "sent" | "received";
 
 interface Message {
@@ -63,17 +65,33 @@ const MessengerDetails = ({
   avatar,
   lastSeen = "Last seen at 11:06 AM",
   isOnline = false,
+  // Optional so existing call sites (e.g. the static demo page) that
+  // don't pass this yet keep working exactly as before — the call
+  // button just shows a "not available" toast until it's wired up
+  // with a real receiver profile id.
+  receiverProfileId,
 }: {
   name?: string;
   avatar?: string;
   lastSeen?: string;
   isOnline?: boolean;
   onBack?: () => void;
+  receiverProfileId?: string;
 }) => {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const [openMenu, setOpenMenu] = useState(false);
+  const [isCalling, setIsCalling] = useState(false);
+
+  const handleCallClick = () => {
+    if (!receiverProfileId) {
+      toast.error("Calling isn't available for this chat yet.");
+      return;
+    }
+    setIsCalling(true);
+  };
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -130,7 +148,10 @@ const MessengerDetails = ({
           </p>
         </div>
 
-        <button className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-rose-100 text-stone-500 transition hover:bg-stone-100 hover:text-stone-700">
+        <button
+          onClick={handleCallClick}
+          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-rose-100 text-stone-500 transition hover:bg-stone-100 hover:text-stone-700"
+        >
           <Phone size={16} />
         </button>
         <div className="relative">
@@ -226,6 +247,14 @@ const MessengerDetails = ({
           <Send size={16} />
         </button>
       </div>
+
+      {isCalling && receiverProfileId && (
+        <CallModal
+          receiverId={receiverProfileId}
+          receiverName={name}
+          onClose={() => setIsCalling(false)}
+        />
+      )}
     </div>
   );
 };
