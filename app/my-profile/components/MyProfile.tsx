@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { useGetMyProfileQuery } from "@/Redux/profileApi";
+import { useGetPartnerPreferenceQuery } from "@/Redux/partnerPreffApi";
 
 const SectionCard = ({
   title,
@@ -84,6 +85,10 @@ const MyProfile = () => {
   const [tab, setTab] = useState("about");
   const { data, isLoading, isError } = useGetMyProfileQuery();
   const apiProfile = data?.data;
+
+  // Partner preference data, used to populate the "Looking for" tab below.
+  const { data: partnerPrefRes } = useGetPartnerPreferenceQuery();
+  const prefData = partnerPrefRes?.data;
 
   if (isLoading) {
     return (
@@ -195,6 +200,86 @@ const MyProfile = () => {
     { label: "Books", items: profile.lifestyle.favouriteBooks },
     { label: "Movies & Shows", items: profile.lifestyle.movies },
   ].filter((group) => group.items.length > 0);
+
+  // ---- Map partner-preference API shape for the "Looking for" tab ----
+  // The partner-preference endpoint returns some fields as populated ref
+  // objects (e.g. { _id, religion: "Hindu" }) and some as plain strings —
+  // this pulls out whichever display label is present, for either shape.
+  const getRefLabel = (v: unknown, field: string): string => {
+    if (!v) return "";
+    if (typeof v === "string") return v;
+    if (typeof v === "object") return (v as any)[field] || "";
+    return "";
+  };
+
+  const partnerHeight =
+    getRefLabel(prefData?.basicDetails?.height?.minHeight, "height") ||
+    getRefLabel(prefData?.basicDetails?.height?.maxHeight, "height") ||
+    "";
+
+  const partnerCaste = getRefLabel(
+    prefData?.religionAndEthnicity?.caste?.preferences?.[0],
+    "caste",
+  );
+  const partnerSubCaste = getRefLabel(
+    prefData?.religionAndEthnicity?.subCaste?.preferences?.[0],
+    "subCaste",
+  );
+
+  const partnerMinAge = prefData?.basicDetails?.age?.minAge;
+  const partnerMaxAge = prefData?.basicDetails?.age?.maxAge;
+
+  const partnerPref = {
+    height: partnerHeight,
+    community:
+      partnerCaste || partnerSubCaste
+        ? `${partnerCaste}${partnerSubCaste ? " - " + partnerSubCaste : ""}`
+        : "",
+    motherTongue: getRefLabel(
+      prefData?.religionAndEthnicity?.motherTongue?.preference,
+      "motherTongue",
+    ),
+    location: [
+      prefData?.basicDetails?.partnerCity?.[0],
+      prefData?.basicDetails?.partnerState?.[0],
+      prefData?.basicDetails?.partnerCountry?.[0],
+    ]
+      .filter(Boolean)
+      .join(", "),
+    income: getRefLabel(
+      prefData?.educationDetails?.annualIncome,
+      "annualIncome",
+    ),
+    ageRange:
+      partnerMinAge || partnerMaxAge
+        ? `${partnerMinAge ?? "?"} - ${partnerMaxAge ?? "?"} yrs`
+        : "",
+    maritalStatus:
+      prefData?.basicDetails?.maritalStatus?.preferences?.[0] || "",
+    highestDegrees: (prefData?.educationDetails?.highestDegrees ?? [])
+      .map((d) => getRefLabel(d, "qualification"))
+      .filter(Boolean),
+    occupation: getRefLabel(
+      prefData?.educationDetails?.occupation?.preferences?.[0],
+      "occupation",
+    ),
+    wellKnownColleges: prefData?.educationDetails?.wellKnownColleges || "",
+    dietaryHabit:
+      prefData?.lifestyleAndAppearance?.dietaryHabits?.preferences?.[0] || "",
+    drinkingHabit:
+      prefData?.lifestyleAndAppearance?.drinkingHabits?.preferences?.[0] || "",
+    smokingHabit:
+      prefData?.lifestyleAndAppearance?.smokingHabits?.preferences?.[0] || "",
+    disability:
+      prefData?.lifestyleAndAppearance?.disability?.preferences?.[0] || "",
+  };
+
+  const partnerLifestyleHasData = Boolean(
+    partnerPref.dietaryHabit ||
+    partnerPref.drinkingHabit ||
+    partnerPref.smokingHabit ||
+    (partnerPref.disability && partnerPref.disability !== "None"),
+  );
 
   return (
     <div>
@@ -610,21 +695,37 @@ const MyProfile = () => {
               editHref={"/my-profile/partner-preferences"}
             >
               <div className="space-y-0.5">
-                <DetailRow icon={<span>↕</span>} label={profile.height} />
-                <DetailRow icon={<span>🕉</span>} label={profile.community} />
+                <DetailRow
+                  icon={<span>↕</span>}
+                  label={partnerPref.height || "Not specified"}
+                />
+                <DetailRow
+                  icon={<span>🕉</span>}
+                  label={partnerPref.community || "Not specified"}
+                />
                 <DetailRow
                   icon={<span>🗣</span>}
-                  label={`Mother tongue is ${profile.motherTongue}`}
+                  label={
+                    partnerPref.motherTongue
+                      ? `Mother tongue is ${partnerPref.motherTongue}`
+                      : "Mother tongue not specified"
+                  }
                 />
                 <DetailRow
                   icon={<MapPin size={14} />}
-                  label={profile.location}
+                  label={partnerPref.location || "Location not specified"}
                 />
-                <DetailRow icon={<span>₹</span>} label={profile.income} />
-                <DetailRow icon={<Calendar size={14} />} label={profile.dob} />
+                <DetailRow
+                  icon={<span>₹</span>}
+                  label={partnerPref.income || "Income not specified"}
+                />
+                <DetailRow
+                  icon={<Calendar size={14} />}
+                  label={partnerPref.ageRange || "Age not specified"}
+                />
                 <DetailRow
                   icon={<span>♥</span>}
-                  label={profile.maritalStatus}
+                  label={partnerPref.maritalStatus || "Not specified"}
                 />
               </div>
             </SectionCard>
@@ -635,27 +736,42 @@ const MyProfile = () => {
               editHref={"/my-profile/partner-preferences"}
             >
               <div className="space-y-3">
-                {profile.education.map((e, i) => (
-                  <div key={i} className="flex gap-3">
-                    <GraduationCap
+                {partnerPref.highestDegrees.length > 0 ? (
+                  partnerPref.highestDegrees.map((degree, i) => (
+                    <div key={i} className="flex gap-3">
+                      <GraduationCap
+                        size={16}
+                        className="text-stone-400 mt-0.5 shrink-0"
+                      />
+                      <p className="text-sm text-stone-800 font-semibold">
+                        {degree}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-stone-400">Not specified</p>
+                )}
+
+                {partnerPref.occupation && (
+                  <div className="flex gap-3">
+                    <Briefcase
                       size={16}
                       className="text-stone-400 mt-0.5 shrink-0"
                     />
-                    <div>
-                      <p className="text-sm text-stone-800 font-semibold">
-                        {e.degree}
-                      </p>
-                      <p className="text-xs text-gray-700">{e.school}</p>
-                    </div>
+                    <p className="text-sm text-stone-800 font-semibold">
+                      {partnerPref.occupation}
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
-              <div className="mt-3 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-400">
-                About my education
+              <div className="mt-3 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-500">
+                {partnerPref.wellKnownColleges || (
+                  <span className="text-stone-400">About my education</span>
+                )}
               </div>
             </SectionCard>
 
-            <SectionCard
+            {/* <SectionCard
               title="Partner Family"
               subtitle="Introduce your family members, values and background"
               editHref={"/my-profile/partner-preferences"}
@@ -693,21 +809,47 @@ const MyProfile = () => {
                   ⚠ Not living with parents
                 </p>
               )}
-            </SectionCard>
+            </SectionCard> */}
 
             <SectionCard
               title="Partner lifestyle & Apperances"
               subtitle="Give other profiles a glimpse of your favourite activities"
               editHref={EDIT_ROUTES.lifestyleInterests}
             >
-              {/* NOTE: left as-is intentionally — the API response has no
-                  partner-preference lifestyle data to bind this to yet.
-                  Once your backend returns something like
-                  apiProfile.partnerPreferences.lifestyle, map it here the
-                  same way "My lifestyle & interests" is done above. */}
-              <div className="border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-400">
-                Add your hobbies, interests and lifestyle preferences.
-              </div>
+              {/* Now bound to partner-preference lifestyleAndAppearance data
+                  (diet/drinking/smoking/disability preferences) instead of
+                  a hardcoded placeholder. There's no partner hobbies/sports/
+                  etc. field in this API, so those tag groups from the
+                  "about" tab don't have an equivalent here. */}
+              {partnerLifestyleHasData ? (
+                <div className="flex flex-wrap gap-2 text-xs text-stone-600">
+                  {partnerPref.dietaryHabit && (
+                    <span className="border border-stone-200 rounded-full px-3 py-1 bg-stone-50">
+                      🍽 {partnerPref.dietaryHabit}
+                    </span>
+                  )}
+                  {partnerPref.drinkingHabit && (
+                    <span className="border border-stone-200 rounded-full px-3 py-1 bg-stone-50">
+                      🍷 Drinks: {partnerPref.drinkingHabit}
+                    </span>
+                  )}
+                  {partnerPref.smokingHabit && (
+                    <span className="border border-stone-200 rounded-full px-3 py-1 bg-stone-50">
+                      🚬 Smokes: {partnerPref.smokingHabit}
+                    </span>
+                  )}
+                  {partnerPref.disability &&
+                    partnerPref.disability !== "None" && (
+                      <span className="border border-stone-200 rounded-full px-3 py-1 bg-stone-50">
+                        ♿ {partnerPref.disability}
+                      </span>
+                    )}
+                </div>
+              ) : (
+                <div className="border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-400">
+                  Add your hobbies, interests and lifestyle preferences.
+                </div>
+              )}
             </SectionCard>
           </>
         )}

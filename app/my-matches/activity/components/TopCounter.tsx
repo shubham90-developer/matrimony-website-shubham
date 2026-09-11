@@ -3,6 +3,8 @@
 import React from "react";
 import Link from "next/link";
 import { Eye, Star, Ban, ChevronRight } from "lucide-react";
+import { useGetMyShortlistQuery } from "@/Redux/shortlistApi";
+import { useGetMyIgnoredProfilesQuery } from "@/Redux/ignoreApi";
 
 interface StatCardData {
   title: string;
@@ -11,30 +13,6 @@ interface StatCardData {
   gradient: string;
   href: string;
 }
-
-const cards: StatCardData[] = [
-  {
-    title: "Viewed You",
-    count: 13,
-    icon: Eye,
-    gradient: "from-indigo-400 via-violet-500 to-purple-500",
-    href: "/my-matches/viewed-you",
-  },
-  {
-    title: "Shortlisted",
-    count: 1,
-    icon: Star,
-    gradient: "from-pink-500 via-rose-500 to-pink-600",
-    href: "/my-profile/shortlist",
-  },
-  {
-    title: "Blocked Profiles",
-    count: 4,
-    icon: Ban,
-    gradient: "from-slate-500 via-slate-600 to-slate-700",
-    href: "/my-profile/block",
-  },
-];
 
 function StatCard({ title, count, icon: Icon, gradient, href }: StatCardData) {
   return (
@@ -76,6 +54,42 @@ function StatCard({ title, count, icon: Icon, gradient, href }: StatCardData) {
 }
 
 const TopStats = () => {
+  // Shortlist and Blocked counts come from live API data. There's no
+  // /profile/visitors (or similar "who viewed me") endpoint in the backend
+  // yet — see app/my-matches/viewed-you/components/ViewedProfiles.tsx,
+  // which has the same note — so "Viewed You" stays at 0 until that API
+  // exists, rather than showing fake data.
+  const { data: shortlistData } = useGetMyShortlistQuery();
+  const { data: ignoreData } = useGetMyIgnoredProfilesQuery();
+
+  const viewedYouCount = 0;
+  const shortlistedCount = shortlistData?.data?.length ?? 0;
+  const blockedCount = ignoreData?.data?.length ?? 0;
+
+  const cards: StatCardData[] = [
+    {
+      title: "Viewed You",
+      count: viewedYouCount,
+      icon: Eye,
+      gradient: "from-indigo-400 via-violet-500 to-purple-500",
+      href: "/my-matches/viewed-you",
+    },
+    {
+      title: "Shortlisted",
+      count: shortlistedCount,
+      icon: Star,
+      gradient: "from-pink-500 via-rose-500 to-pink-600",
+      href: "/my-profile/shortlist",
+    },
+    {
+      title: "Blocked Profiles",
+      count: blockedCount,
+      icon: Ban,
+      gradient: "from-slate-500 via-slate-600 to-slate-700",
+      href: "/my-profile/block",
+    },
+  ];
+
   return (
     <div className="grid grid-cols-3 gap-1.5 xs:gap-2 sm:gap-3 md:gap-4">
       {cards.map((card) => (

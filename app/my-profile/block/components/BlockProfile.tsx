@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   ChevronLeft,
   MapPin,
@@ -8,53 +7,88 @@ import {
   Ruler,
   HeartOff,
   Unlock,
+  Loader2,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import toast, { Toaster } from "react-hot-toast";
+import {
+  useGetMyIgnoredProfilesQuery,
+  useRemoveFromIgnoreMutation,
+  type IgnoreEntry,
+} from "@/Redux/ignoreApi";
 
-// Placeholder data - swap for your API/query result.
-const shortlisted = [
-  {
-    id: "UXZ48213",
-    name: "Aarav Deshmukh",
-    age: 29,
-    height: "5'9\"",
-    location: "Pune, Maharashtra",
-    profession: "UX Professional",
-    image: "/img/matches/1.jpg",
-  },
-  {
-    id: "UXZ39871",
-    name: "Rohan Kulkarni",
-    age: 31,
-    height: "5'11\"",
-    location: "Mumbai, Maharashtra",
-    profession: "Software Engineer",
-    image: "/img/matches/1.jpg",
-  },
-  {
-    id: "UXZ55120",
-    name: "Devendra Patil",
-    age: 28,
-    height: "5'8\"",
-    location: "Nashik, Maharashtra",
-    profession: "Chartered Accountant",
-    image: "/img/matches/1.jpg",
-  },
-];
+const FALLBACK_IMAGE = "/img/matches/1.jpg";
+
+interface CardProfile {
+  ignoreId: string;
+  id: string;
+  name: string;
+  age: number;
+  height: string;
+  location: string;
+  profession: string;
+  image: string;
+}
+
+const toCardProfile = (entry: IgnoreEntry): CardProfile => {
+  // `entry.profile` may be missing on some API responses; in that case
+  // `entry.ignoredUserId` itself comes back populated with the same
+  // shape (basicDetails, photos, matrimonyId, etc.) instead of being a
+  // plain string id. Normalize both cases here so we never hand a raw
+  // object to JSX.
+  const rawUser =
+    entry.profile ??
+    (typeof entry.ignoredUserId === "object"
+      ? (entry.ignoredUserId as unknown as IgnoreEntry["profile"])
+      : undefined);
+
+  const basic = rawUser?.basicDetails;
+  const career = rawUser?.careerDetails;
+  const edu = rawUser?.educationDetails;
+
+  const fallbackId =
+    typeof entry.ignoredUserId === "string" ? entry.ignoredUserId : "";
+
+  return {
+    ignoreId: entry._id,
+    id: rawUser?.matrimonyId || fallbackId || "N/A",
+    name:
+      `${basic?.firstName ?? ""} ${basic?.lastName ?? ""}`.trim() || "Unknown",
+    age: basic?.age ?? 0,
+    height: basic?.height ?? "",
+    location: rawUser?.locationDetails?.city ?? "",
+    profession: career?.occupation || edu?.occupation || "",
+    image: rawUser?.photos?.[0] || FALLBACK_IMAGE,
+  };
+};
 
 const ProfileCard = ({
   profile,
-  onUnblock,
+  onUnblocked,
 }: {
-  profile: any;
-  onUnblock?: (id: string) => void;
+  profile: CardProfile;
+  onUnblocked: (ignoreId: string) => void;
 }) => {
-  const handleUnblock = (e: React.MouseEvent) => {
+  const [removeFromIgnore, { isLoading: unblocking }] =
+    useRemoveFromIgnoreMutation();
+
+  const handleUnblock = async (e: React.MouseEvent) => {
     // keep the button from triggering the parent <Link> navigation
     e.preventDefault();
     e.stopPropagation();
-    onUnblock?.(profile.id);
+    if (unblocking) return;
+
+    try {
+      await removeFromIgnore(profile.ignoreId).unwrap();
+      toast.success(`${profile.name} unblocked`);
+      onUnblocked(profile.ignoreId);
+    } catch (err) {
+      const message =
+        (err as { data?: { message?: string } })?.data?.message ||
+        "Couldn't unblock this profile. Please try again.";
+      toast.error(message);
+    }
   };
 
   return (
@@ -90,26 +124,35 @@ const ProfileCard = ({
           <span className="truncate">{profile.location}</span>
         </p>
 
-        <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-white/80 xs:text-xs">
-          <Briefcase size={10} className="shrink-0 xs:size-[11px]" />
-          <span className="truncate">{profile.profession}</span>
-        </p>
+        {profile.profession && (
+          <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-white/80 xs:text-xs">
+            <Briefcase size={10} className="shrink-0 xs:size-[11px]" />
+            <span className="truncate">{profile.profession}</span>
+          </p>
+        )}
 
         <p className="mt-0.5 flex items-center gap-2 truncate text-[9px] text-white/60 xs:text-[11px]">
-          <span className="flex items-center gap-1">
-            <Ruler size={10} className="shrink-0" />
-            {profile.height}
-          </span>
-          <span>ID - {profile.id}</span>
+          {profile.height && (
+            <span className="flex items-center gap-1">
+              <Ruler size={10} className="shrink-0" />
+              {profile.height}
+            </span>
+          )}
+          <span className="truncate">ID - {profile.id}</span>
         </p>
 
         <button
           type="button"
           onClick={handleUnblock}
-          className="relative z-30 mt-2 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-white/15 py-1.5 text-[10px] font-semibold text-white backdrop-blur transition hover:bg-white/25 xs:mt-2.5 xs:py-2 xs:text-xs"
+          disabled={unblocking}
+          className="relative z-30 mt-2 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-white/15 py-1.5 text-[10px] font-semibold text-white backdrop-blur transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-50 xs:mt-2.5 xs:py-2 xs:text-xs"
         >
-          <Unlock size={13} />
-          Unblock
+          {unblocking ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <Unlock size={13} />
+          )}
+          {unblocking ? "Unblocking..." : "Unblock"}
         </button>
       </div>
     </Link>
@@ -134,40 +177,51 @@ const EmptyState = () => (
 );
 
 const BlockProfile = () => {
-  const handleUnblock = (profileId: string) => {
-    // TODO: wire up to your unblock mutation/API
-    console.log("Unblock profile:", profileId);
-  };
+  const { data, isLoading, isError } = useGetMyIgnoredProfilesQuery();
+
+  const blocked = (data?.data ?? []).map(toCardProfile);
 
   return (
-    <div className="rounded-xl border border-gray-200 p-4">
-      <div className="relative mb-4 flex items-center justify-center border-b border-dashed border-gray-200 py-3">
-        <Link
-          href="/my-matches/activity"
-          className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-100"
-          aria-label="Go back"
-        >
-          <ChevronLeft size={20} />
-        </Link>
-        <h3 className="font-serif text-xl font-semibold text-slate-900">
-          Block Profiles
-        </h3>
-      </div>
-
-      {shortlisted.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {shortlisted.map((profile) => (
-            <ProfileCard
-              key={profile.id}
-              profile={profile}
-              onUnblock={handleUnblock}
-            />
-          ))}
+    <>
+      <Toaster position="top-center" reverseOrder={false} />
+      <div className="rounded-xl border border-gray-200 p-4">
+        <div className="relative mb-4 flex items-center justify-center border-b border-dashed border-gray-200 py-3">
+          <Link
+            href="/my-matches/activity"
+            className="absolute left-0 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-100"
+            aria-label="Go back"
+          >
+            <ChevronLeft size={20} />
+          </Link>
+          <h3 className="font-serif text-xl font-semibold text-slate-900">
+            Block Profiles
+          </h3>
         </div>
-      ) : (
-        <EmptyState />
-      )}
-    </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-sm text-stone-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading blocked profiles...
+          </div>
+        ) : isError ? (
+          <div className="py-16 text-center text-sm text-rose-500">
+            Unable to load blocked profiles. Please try again.
+          </div>
+        ) : blocked.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {blocked.map((profile) => (
+              <ProfileCard
+                key={profile.ignoreId}
+                profile={profile}
+                onUnblocked={() => {}}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState />
+        )}
+      </div>
+    </>
   );
 };
 

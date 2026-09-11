@@ -28,6 +28,11 @@ export interface PackageListResponse {
   data: MembershipPackage[];
 }
 
+export interface PackageResponse {
+  success: boolean;
+  data: MembershipPackage;
+}
+
 export const packageApi = createApi({
   reducerPath: "packageApi",
   tagTypes: ["Package"],
@@ -38,7 +43,13 @@ export const packageApi = createApi({
       query: () => "/admin/package",
       providesTags: ["Package"],
     }),
+
+    // GET /v1/api/admin/package/{id} -> a single membership package
+    getPackageById: builder.query<PackageResponse, string>({
+      query: (id) => `/admin/package/${id}`,
+      providesTags: (result, error, id) => [{ type: "Package", id }],
+    }),
   }),
 });
 
-export const { useGetPackagesQuery } = packageApi;
+export const { useGetPackagesQuery, useGetPackageByIdQuery } = packageApi;

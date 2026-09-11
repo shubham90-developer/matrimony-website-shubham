@@ -18,6 +18,9 @@ import { packageApi } from "./packagesApi";
 import { termsApi } from "./terms";
 import { privacyPolicyApi } from "./privacy-policyApi";
 import { partnerPreferenceApi } from "./partnerPreffApi";
+import { profileVisitApi } from "./profileVisitsApi";
+import { counterApi } from "./counter";
+import { paymentApi } from "./paymentApi";
 
 export const store = configureStore({
   reducer: {
@@ -38,6 +41,9 @@ export const store = configureStore({
     [termsApi.reducerPath]: termsApi.reducer,
     [privacyPolicyApi.reducerPath]: privacyPolicyApi.reducer,
     [partnerPreferenceApi.reducerPath]: partnerPreferenceApi.reducer,
+    [profileVisitApi.reducerPath]: profileVisitApi.reducer,
+    [counterApi.reducerPath]: counterApi.reducer,
+    [paymentApi.reducerPath]: paymentApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -58,6 +64,9 @@ export const store = configureStore({
       termsApi.middleware,
       privacyPolicyApi.middleware,
       partnerPreferenceApi.middleware,
+      profileVisitApi.middleware,
+      counterApi.middleware,
+      paymentApi.middleware,
     ),
 });
 

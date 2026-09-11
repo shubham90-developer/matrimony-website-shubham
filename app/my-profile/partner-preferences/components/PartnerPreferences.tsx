@@ -433,6 +433,19 @@ const PartnerPreferences = () => {
     [stateList, form.state],
   );
 
+  // The GET /partner-preference endpoint returns some fields populated
+  // (full ref objects like { _id, religion: "Hindu" }) and some as plain
+  // id strings — these two helpers normalize either shape down to a
+  // plain id string / array of id strings, which is what every dropdown
+  // value and the SAVE payload expect.
+  const extractId = (v: unknown): string =>
+    typeof v === "object" && v !== null
+      ? ((v as any)._id ?? "")
+      : ((v as string) ?? "");
+
+  const extractIdArray = (arr: unknown): string[] =>
+    Array.isArray(arr) ? arr.map((v) => extractId(v)).filter(Boolean) : [];
+
   /* ===================================================
      PREFILL FROM SAVED PARTNER PREFERENCE
   =================================================== */
@@ -447,21 +460,33 @@ const PartnerPreferences = () => {
       // Age range is stored as minAge/maxAge on the backend; this form only
       // exposes a single date, so there is no reliable way to reconstruct a
       // date of birth from a saved age range — left blank on reload.
-      height:
-        pref.basicDetails?.height?.minHeight ||
-        pref.basicDetails?.height?.maxHeight ||
-        "",
+      // minHeight/maxHeight come back as populated height ref objects, so
+      // this needs the same id-extraction as religion/caste/subCaste.
+      height: extractId(
+        pref.basicDetails?.height?.minHeight ??
+          pref.basicDetails?.height?.maxHeight,
+      ),
       maritalStatus: pref.basicDetails?.maritalStatus?.preferences?.[0] || "",
 
-      religion: pref.religionAndEthnicity?.religion?.preference || "",
-      caste: pref.religionAndEthnicity?.caste?.preferences?.[0] || "",
-      subCaste: pref.religionAndEthnicity?.subCaste?.preferences?.[0] || "",
-      motherTongue: pref.religionAndEthnicity?.motherTongue?.preference || "",
+      religion: extractId(pref.religionAndEthnicity?.religion?.preference),
+      caste: extractId(pref.religionAndEthnicity?.caste?.preferences?.[0]),
+      subCaste: extractId(
+        pref.religionAndEthnicity?.subCaste?.preferences?.[0],
+      ),
+      motherTongue: extractId(
+        pref.religionAndEthnicity?.motherTongue?.preference,
+      ),
 
-      highestEducation: pref.educationDetails?.highestDegrees?.[0] || "",
-      occupation: pref.educationDetails?.occupation?.preferences?.[0] || "",
-      annualIncome: pref.educationDetails?.annualIncome || "",
+      // highestDegrees[0] / occupation.preferences[0] / annualIncome are
+      // also populated ref objects on this endpoint — extract their ids.
+      highestEducation: extractId(pref.educationDetails?.highestDegrees?.[0]),
+      occupation: extractId(
+        pref.educationDetails?.occupation?.preferences?.[0],
+      ),
+      annualIncome: extractId(pref.educationDetails?.annualIncome),
 
+      // Lifestyle fields are plain hardcoded-enum strings on this endpoint
+      // (e.g. "Vegetarian", "No") — no id extraction needed.
       diet: pref.lifestyleAndAppearance?.dietaryHabits?.preferences?.[0] || "",
       smoking:
         pref.lifestyleAndAppearance?.smokingHabits?.preferences?.[0] || "",
@@ -526,12 +551,13 @@ const PartnerPreferences = () => {
     const maxAge = age ?? existing?.basicDetails?.age?.maxAge ?? 0;
 
     // The UI only lets a person pick one height, so it's sent as both ends
-    // of the accepted height range.
+    // of the accepted height range. Fallback pulls from `existing`, which
+    // may hold a populated height ref object — extract its id.
     const heightId = form.height || undefined;
     const minHeight =
-      heightId || existing?.basicDetails?.height?.minHeight || "";
+      heightId || extractId(existing?.basicDetails?.height?.minHeight) || "";
     const maxHeight =
-      heightId || existing?.basicDetails?.height?.maxHeight || "";
+      heightId || extractId(existing?.basicDetails?.height?.maxHeight) || "";
 
     const payload: PartnerPreferencePayload = {
       basicDetails: {
@@ -558,18 +584,21 @@ const PartnerPreferences = () => {
         doesntMatter: existing?.educationDetails?.doesntMatter ?? false,
         highestDegrees: form.highestEducation
           ? [form.highestEducation]
-          : (existing?.educationDetails?.highestDegrees as string[]) || [],
+          : extractIdArray(existing?.educationDetails?.highestDegrees),
         wellKnownColleges: existing?.educationDetails?.wellKnownColleges || "",
         occupation: {
           doesntMatter:
             existing?.educationDetails?.occupation?.doesntMatter ?? false,
           preferences: form.occupation
             ? [form.occupation]
-            : (existing?.educationDetails?.occupation
-                ?.preferences as string[]) || [],
+            : extractIdArray(
+                existing?.educationDetails?.occupation?.preferences,
+              ),
         },
         annualIncome:
-          form.annualIncome || existing?.educationDetails?.annualIncome || "",
+          form.annualIncome ||
+          extractId(existing?.educationDetails?.annualIncome) ||
+          "",
       },
 
       familyDetails: {
@@ -583,25 +612,29 @@ const PartnerPreferences = () => {
         religion: {
           preference:
             form.religion ||
-            existing?.religionAndEthnicity?.religion?.preference ||
+            extractId(existing?.religionAndEthnicity?.religion?.preference) ||
             "",
         },
         caste: {
           preferences: form.caste
             ? [form.caste]
-            : (existing?.religionAndEthnicity?.caste
-                ?.preferences as string[]) || [],
+            : extractIdArray(
+                existing?.religionAndEthnicity?.caste?.preferences,
+              ),
         },
         subCaste: {
           preferences: form.subCaste
             ? [form.subCaste]
-            : (existing?.religionAndEthnicity?.subCaste
-                ?.preferences as string[]) || [],
+            : extractIdArray(
+                existing?.religionAndEthnicity?.subCaste?.preferences,
+              ),
         },
         motherTongue: {
           preference:
             form.motherTongue ||
-            existing?.religionAndEthnicity?.motherTongue?.preference ||
+            extractId(
+              existing?.religionAndEthnicity?.motherTongue?.preference,
+            ) ||
             "",
         },
         manglikStatus: {
@@ -694,7 +727,7 @@ const PartnerPreferences = () => {
           <div className="grid grid-cols-1 gap-4">
             {/* Gender */}
 
-            <FieldSelect
+            {/* <FieldSelect
               id="gender"
               label="Gender"
               value={form.gender}
@@ -713,13 +746,13 @@ const PartnerPreferences = () => {
                   label: "Other",
                 },
               ]}
-            />
+            /> */}
 
             {/* ===================================================
     DATE OF BIRTH
 =================================================== */}
 
-            <div>
+            {/* <div>
               <label className={labelClass}>Date of birth</label>
 
               <div className="relative">
@@ -786,7 +819,7 @@ const PartnerPreferences = () => {
       "
                 />
               </div>
-            </div>
+            </div> */}
 
             {/* Height */}
 
@@ -914,19 +947,19 @@ const PartnerPreferences = () => {
               options={[
                 {
                   value: "Never Married",
-                  label: "Never married",
+                  label: "Never Married",
                 },
                 {
-                  value: "Married",
-                  label: "Married",
+                  value: "Divorce",
+                  label: "Divorce",
                 },
                 {
-                  value: "Divorced",
-                  label: "Divorced",
+                  value: "Widow",
+                  label: "Widow",
                 },
                 {
-                  value: "Widowed",
-                  label: "Widowed",
+                  value: "Awaiting Divorce",
+                  label: "Awaiting Divorce",
                 },
               ]}
             />
@@ -969,7 +1002,7 @@ const PartnerPreferences = () => {
                 the partner-preference schema has no separate slot for it,
                 so it stays local-only (kept exactly as before). */}
 
-            <FieldSelect
+            {/* <FieldSelect
               id="ugDegree"
               label="UG degree"
               value={form.ugDegree}
@@ -989,7 +1022,7 @@ const PartnerPreferences = () => {
                   label: "B.A.",
                 },
               ]}
-            />
+            /> */}
 
             {/* Occupation */}
 
@@ -1078,6 +1111,10 @@ const PartnerPreferences = () => {
               placeholder="Search smoking habit..."
               options={[
                 {
+                  value: "Yes",
+                  label: "Yes",
+                },
+                {
                   value: "No",
                   label: "No",
                 },
@@ -1086,8 +1123,8 @@ const PartnerPreferences = () => {
                   label: "Occasionally",
                 },
                 {
-                  value: "Yes",
-                  label: "Yes",
+                  value: "Doesn't Matter",
+                  label: "Doesn't Matter",
                 },
               ]}
             />
@@ -1102,16 +1139,20 @@ const PartnerPreferences = () => {
               placeholder="Search drinking habit..."
               options={[
                 {
+                  value: "Doesn't Matter",
+                  label: "Doesn't Matter",
+                },
+                {
+                  value: "Yes",
+                  label: "Yes",
+                },
+                {
                   value: "No",
                   label: "No",
                 },
                 {
                   value: "Occasionally",
                   label: "Occasionally",
-                },
-                {
-                  value: "Yes",
-                  label: "Yes",
                 },
               ]}
             />

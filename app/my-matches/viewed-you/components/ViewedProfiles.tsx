@@ -1,11 +1,15 @@
 "use client";
 
-import { ArrowLeft, MapPin } from "lucide-react";
+import { ArrowLeft, MapPin, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import {
+  useGetProfileVisitorsQuery,
+  type ProfileVisitEntry,
+  type VisitProfileSummary,
+} from "@/Redux/profileVisitsApi";
 
-// Only status rendered on this page — this page shows Visitors only.
 type Status = "visitor";
 
 interface CardProfile {
@@ -21,10 +25,51 @@ const STATUS_CONFIG: Record<Status, { label: string; badgeClass: string }> = {
   visitor: { label: "Visited", badgeClass: "bg-blue-500/90" },
 };
 
-// Visitors are view-only — there's no accept/decline/withdraw action to take.
-// No /profile/visitors endpoint exists yet in the backend, so this list stays
-// empty until that API is available.
-const VISITORS: CardProfile[] = [];
+const FALLBACK_IMAGE = "/img/profile/1.jpg";
+
+// Turns an ISO timestamp into a short relative label like "2 days ago".
+const timeAgo = (isoDate: string): string => {
+  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `${diffDays}d ago`;
+
+  const diffMonths = Math.floor(diffDays / 30);
+  return `${diffMonths}mo ago`;
+};
+
+// The `viewerProfileId` field on a visit entry may come back as the full
+// populated summary (basicDetails/locationDetails/etc.) or, in edge cases,
+// as a plain string id. Normalize both so we never hand a raw object to JSX.
+const toCardProfile = (entry: ProfileVisitEntry): CardProfile | null => {
+  const viewer = entry.viewerProfileId;
+
+  if (typeof viewer === "string") {
+    // No populated profile data to show — skip rather than render a blank card.
+    return null;
+  }
+
+  const summary = viewer as VisitProfileSummary;
+  const basic = summary.basicDetails;
+  const location = summary.locationDetails;
+
+  return {
+    id: summary._id,
+    name:
+      `${basic?.firstName ?? ""} ${basic?.lastName ?? ""}`.trim() || "Unknown",
+    age: 0,
+    location: [location?.city, location?.state].filter(Boolean).join(", "),
+    image: summary.photos?.[0] || FALLBACK_IMAGE,
+    meta: entry.createdAt ? timeAgo(entry.createdAt) : undefined,
+  };
+};
 
 function ProfileCard({
   profile,
@@ -37,7 +82,7 @@ function ProfileCard({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white transition hover:shadow-md">
-      <Link href="/my-matches/details">
+      <Link href={`/my-matches/details?id=${encodeURIComponent(profile.id)}`}>
         <div className="relative aspect-3/4 cursor-pointer">
           <Image
             src={profile.image}
@@ -56,13 +101,16 @@ function ProfileCard({
 
         <div className="p-2.5 pb-3">
           <p className="truncate text-sm font-semibold text-slate-900">
-            {profile.name}, {profile.age}
+            {profile.name}
+            {profile.age ? `, ${profile.age}` : ""}
           </p>
 
-          <p className="mt-1 flex items-center gap-1 truncate text-xs text-stone-500">
-            <MapPin size={11} />
-            {profile.location}
-          </p>
+          {profile.location && (
+            <p className="mt-1 flex items-center gap-1 truncate text-xs text-stone-500">
+              <MapPin size={11} />
+              {profile.location}
+            </p>
+          )}
 
           {profile.meta && (
             <p className="mt-1 truncate text-[11px] text-stone-400">
@@ -79,11 +127,46 @@ function ActivitySection({
   title,
   profiles,
   status,
+  isLoading,
+  isError,
 }: {
   title: string;
   profiles: CardProfile[];
   status: Status;
+  isLoading: boolean;
+  isError: boolean;
 }) {
+  if (isLoading) {
+    return (
+      <div className="mb-8">
+        {title && (
+          <h3 className="mb-3 text-[15px] font-semibold text-slate-900">
+            {title}
+          </h3>
+        )}
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-stone-200 py-10 text-sm text-stone-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading visitors...
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="mb-8">
+        {title && (
+          <h3 className="mb-3 text-[15px] font-semibold text-slate-900">
+            {title}
+          </h3>
+        )}
+        <p className="rounded-xl border border-dashed border-rose-200 py-6 text-center text-sm text-rose-500">
+          Unable to load visitors. Please try again.
+        </p>
+      </div>
+    );
+  }
+
   if (profiles.length === 0) {
     return (
       <div className="mb-8">
@@ -152,16 +235,32 @@ function PageHeader({
 }
 
 export default function ProfileVisitors() {
+  const { data, isLoading, isError } = useGetProfileVisitorsQuery();
+
+  const visitors = (data?.data ?? [])
+    .map(toCardProfile)
+    .filter((p): p is CardProfile => p !== null);
+
   return (
     <div className="space-y-8 border border-gray-200 p-3">
       <PageHeader
         title="Profile Visitors"
-        subtitle={`${VISITORS.length} people viewed your profile`}
+        subtitle={
+          isLoading
+            ? "Loading..."
+            : `${visitors.length} people viewed your profile`
+        }
         imageSrc="/img/logo/2.png"
         imageAlt="App logo"
       />
 
-      <ActivitySection title="" profiles={VISITORS} status="visitor" />
+      <ActivitySection
+        title=""
+        profiles={visitors}
+        status="visitor"
+        isLoading={isLoading}
+        isError={isError}
+      />
     </div>
   );
 }

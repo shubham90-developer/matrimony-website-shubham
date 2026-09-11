@@ -2,6 +2,7 @@
 
 import React from "react";
 import { User, CheckCircle2, Handshake, ShieldCheck } from "lucide-react";
+import { useGetCounterQuery } from "@/Redux/counter";
 
 type Stat = {
   icon: "verified" | "customers" | "years";
@@ -9,7 +10,9 @@ type Stat = {
   label: string;
 };
 
-const stats: Stat[] = [
+// Fallback values shown while the API is loading or if the request fails,
+// so the UI never breaks or shows blank stats.
+const defaultStats: Stat[] = [
   {
     icon: "verified",
     value: "100%",
@@ -63,6 +66,31 @@ const StatIcon = ({ type }: { type: Stat["icon"] }) => {
 };
 
 const Counter = () => {
+  const { data, isLoading, isError } = useGetCounterQuery();
+
+  // Build the stats array from API data when available, otherwise fall back
+  // to the static defaults (keeps labels/layout identical either way).
+  const stats: Stat[] =
+    !isLoading && !isError && data?.data
+      ? [
+          {
+            icon: "verified",
+            value: data.data.mobileVerifiedProfiles,
+            label: "Mobile-verified profiles",
+          },
+          {
+            icon: "customers",
+            value: data.data.customersServed,
+            label: "Customers served",
+          },
+          {
+            icon: "years",
+            value: data.data.successfulMatchmakingYears,
+            label: "of successful matchmaking",
+          },
+        ]
+      : defaultStats;
+
   return (
     <section className="w-full bg-[#FDF8F3] py-0 px-5 sm:px-8 lg:px-8">
       <div className="mx-auto max-w-7xl  bg-rose-100 p-8 py-15">

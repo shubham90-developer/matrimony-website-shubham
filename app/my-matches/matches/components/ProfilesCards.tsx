@@ -33,9 +33,10 @@ import {
 import { useSendInterestMutation } from "@/Redux/interestApi";
 import { useAddToShortlistMutation } from "@/Redux/shortlistApi";
 import { useAddToIgnoreMutation } from "@/Redux/ignoreApi";
+import { useRecordProfileVisitMutation } from "@/Redux/profileVisitsApi";
 
 interface Profile {
-  matchPercent: any;
+  matchPercent?: number;
   id: string;
   userId: string;
   name: string;
@@ -242,37 +243,6 @@ function UpgradeModal({ profile, onClose }: UpgradeModalProps) {
   );
 }
 
-/* ---------------- Lightbox / Popup ---------------- */
-
-/* ---------------- Profile Card ---------------- */
-
-// NOTE on data used by this version that wasn't in your original Profile fields:
-//   p.verified?: boolean       -> shows the green "Verified" badge when true
-//   p.matchPercent?: number    -> shows the pink match-% badge when present (e.g. 73)
-// If your Profile type doesn't have these yet, add them (or rename to whatever
-// your API already returns) — the badges just won't render until the field exists.
-//
-// Also make sure `lucide-react` import includes: Send, User, GraduationCap,
-// Languages, Loader2, Images, ShieldCheck, Heart
-
-// NOTE on data used by this version that wasn't in your original Profile fields:
-//   p.verified?: boolean       -> shows the green "Verified" badge when true
-//   p.matchPercent?: number    -> shows the pink match-% badge when present (e.g. 73)
-// If your Profile type doesn't have these yet, add them (or rename to whatever
-// your API already returns) — the badges just won't render until the field exists.
-//
-// Also make sure `lucide-react` import includes: Send, User, GraduationCap,
-// Languages, Loader2, Images, ShieldCheck, Heart
-
-// NOTE on data used by this version that wasn't in your original Profile fields:
-//   p.verified?: boolean       -> shows the green "Verified" badge when true
-//   p.matchPercent?: number    -> shows the pink match-% badge when present (e.g. 73)
-// If your Profile type doesn't have these yet, add them (or rename to whatever
-// your API already returns) — the badges just won't render until the field exists.
-//
-// Also make sure `lucide-react` import includes: Send, User, GraduationCap,
-// Languages, Loader2, Images, ShieldCheck, Heart
-
 function ProfileCard({
   p,
   onHide,
@@ -288,7 +258,7 @@ function ProfileCard({
   const [addToShortlist, { isLoading: shortlistLoading }] =
     useAddToShortlistMutation();
   const [addToIgnore, { isLoading: ignoreLoading }] = useAddToIgnoreMutation();
-
+  const [recordProfileVisit] = useRecordProfileVisitMutation();
   const actionLoading: Record<ActionKey, boolean> = {
     interest: interestLoading,
     shortlist: shortlistLoading,
@@ -343,10 +313,14 @@ function ProfileCard({
     }
   };
 
+  const handleCardClick = () => {
+    recordProfileVisit({ visitedProfileId: p.userId }).catch(() => {});
+  };
   return (
     <>
       <Link
         href={`/my-matches/details?id=${encodeURIComponent(p.id)}`}
+        onClick={handleCardClick}
         className="group relative block h-150 w-full overflow-hidden rounded-[28px] border border-stone-200/70 bg-stone-900 shadow-[0_1px_2px_rgba(60,40,30,0.06),0_14px_28px_-18px_rgba(60,40,30,0.4)] transition-shadow duration-300 hover:shadow-[0_1px_2px_rgba(60,40,30,0.08),0_22px_38px_-18px_rgba(60,40,30,0.5)] sm:h-160"
       >
         {/* Photo — fills the entire card as the background. Clicking anywhere

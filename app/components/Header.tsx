@@ -413,9 +413,10 @@ const Header = () => {
     </div>
   );
 
-  const { data } = useGetMyProfileQuery();
+  const hasToken =
+    typeof window !== "undefined" && !!localStorage.getItem("accessToken");
 
-  console.log("data", data);
+  const { data } = useGetMyProfileQuery(undefined, { skip: !hasToken });
   return (
     <header className="relative z-50 w-full border-b border-rose-100 bg-white shadow-xs">
       <div className="mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:h-18 lg:px-8">

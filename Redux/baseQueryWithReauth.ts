@@ -88,8 +88,13 @@ export const baseQueryWithReauth: BaseQueryFn<
       // retry the original request with the new access token
       result = await rawBaseQuery(args, api, extraOptions);
     } else {
-      // Optional: redirect to login on hard refresh failure
-      if (typeof window !== "undefined") {
+      // Redirect to login on hard refresh failure — but only if we're not
+      // already there, otherwise this reloads /login forever (401 -> redirect
+      // -> reload -> Header re-fires the query -> 401 -> redirect...).
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/login"
+      ) {
         window.location.href = "/login";
       }
     }
